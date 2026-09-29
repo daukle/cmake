@@ -1,0 +1,2 @@
+kind: generic
+description: The cmake toolchain plugin for daukle. It compiles, links and runs a C or C++ project from a repository holding only daukle.toml and src/, with a CMake it provisions and verifies itself, generating one CMakeLists.txt into build/daukle/cmake/ and nothing in the user's tree.
