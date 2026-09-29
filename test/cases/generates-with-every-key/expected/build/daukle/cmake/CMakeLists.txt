@@ -10,7 +10,7 @@ target_include_directories(app PRIVATE
      "${CMAKE_CURRENT_SOURCE_DIR}/../../../include"
 )
 target_compile_definitions(app PRIVATE "FEATURE=1" "QUIET")
-set_target_properties(app PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+set_target_properties(app PROPERTIES CXX_STANDARD "17" CXX_STANDARD_REQUIRED ON)
 
-add_custom_target(run COMMAND "$<TARGET_FILE:app>" USES_TERMINAL)
+add_custom_target(run COMMAND "$<TARGET_FILE:app>" USES_TERMINAL VERBATIM)
 add_dependencies(run app)

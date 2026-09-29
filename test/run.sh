@@ -122,7 +122,14 @@ run_case() {
       produced_ok=0
       while IFS= read -r produced || [ -n "$produced" ]; do
         [ -z "$produced" ] && continue
-        if [ ! -s "$sandbox/$produced" ]; then
+        # Expanded as a glob, because the path a build writes its binary to is
+        # generator-dependent and a case must be able to name it on every
+        # platform. An unmatched glob stays literal and fails the -s below.
+        found=0
+        for candidate in $sandbox/$produced; do
+          [ -s "$candidate" ] && found=1 && break
+        done
+        if [ "$found" -eq 0 ]; then
           fail "$name/$manifest_name" "$produced is missing or empty"
           produced_ok=1
         fi

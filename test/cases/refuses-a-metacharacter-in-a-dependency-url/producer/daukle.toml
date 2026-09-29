@@ -1,0 +1,10 @@
+schema = 1
+project = "forebay/basekit"
+version = "5.0.0"
+
+[modules.ir]
+
+  [modules.ir.cmake]
+  package = "basekit-ir"
+  url = "https://x\")\nmessage(FATAL_ERROR \"injected"
+  sha256 = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"

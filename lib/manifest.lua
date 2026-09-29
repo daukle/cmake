@@ -1,10 +1,20 @@
 local LANGUAGES = { c = "C", ["c++"] = "CXX" }
 local STANDARD_PROPERTY = { c = "C_STANDARD", ["c++"] = "CXX_STANDARD" }
 local KINDS = { executable = true, library = true }
-local DEFAULT_SOURCES = { "src/*.c" }
+local DEFAULT_SOURCES = {
+  c = { "src/*.c" },
+  ["c++"] = { "src/*.cpp", "src/*.cc", "src/*.cxx" },
+}
+
+local KNOWN_KEYS = {
+  version = true, language = true, kind = true, sources = true, includes = true,
+  defines = true, standard = true, buildType = true, generator = true,
+  configureArgs = true, buildArgs = true, runArgs = true, dependencies = true,
+}
 
 local function config_of(context)
-  return context.toolchain ~= nil and context.toolchain.config or context.config
+  if context.toolchain ~= nil then return context.toolchain.config end
+  return context.config
 end
 
 local function version_of(context)
@@ -27,22 +37,61 @@ local function climbs_out(path)
   return string.find(path, "/../", 1, true) ~= nil or string.match(path, "/%.%.$") ~= nil
 end
 
-local function string_list(value, key, singular)
+-- Everything here is interpolated into a file the user is told not to read, so
+-- a character that ends a CMake argument or starts a variable expansion cannot
+-- be allowed through. configureArgs is the escape hatch for anything this
+-- refuses.
+local function escapes_cmake(value)
+  return string.find(value, '"', 1, true) ~= nil
+      or string.find(value, "\\", 1, true) ~= nil
+      or string.find(value, "$", 1, true) ~= nil
+      or string.find(value, ")", 1, true) ~= nil
+      or string.find(value, ";", 1, true) ~= nil
+      or string.find(value, "\n", 1, true) ~= nil
+      or string.find(value, "\r", 1, true) ~= nil
+end
+
+local function reject_escapes(value, key)
+  if escapes_cmake(value) then
+    error(string.format('"%s" may not carry a CMake metacharacter, and "%s" does:'
+                        .. ' a generated file is one nobody reads, so use "configureArgs"'
+                        .. ' for anything this refuses', key, value), 0)
+  end
+end
+
+local function string_list(value, key, plural, singular)
   if value == nil then return nil end
   if type(value) ~= "table" then
-    error('"' .. key .. '" must be a list of ' .. singular .. ', not a ' .. type(value), 0)
+    error('"' .. key .. '" must be a list of ' .. plural .. ', not a ' .. type(value), 0)
+  end
+  local count = 0
+  for _ in pairs(value) do count = count + 1 end
+  if count ~= #value then
+    error('"' .. key .. '" must be a list of ' .. plural .. ', not a table of named keys', 0)
   end
   for index = 1, #value do
     if type(value[index]) ~= "string" then
       error(string.format('"%s" must name a %s as a string, not a %s',
-                          key, singular:gsub("s$", ""), type(value[index])), 0)
+                          key, singular, type(value[index])), 0)
     end
   end
   return value
 end
 
-local function path_list(value, key, singular)
-  local list = string_list(value, key, singular)
+-- Only for a list whose entries are interpolated into the generated file. The
+-- three *Args lists are the documented escape hatch and reach daukle.exec as
+-- argv, so they must NOT be narrowed this way.
+local function cmake_text_list(value, key, plural, singular)
+  local list = string_list(value, key, plural, singular)
+  if list == nil then return nil end
+  for index = 1, #list do
+    reject_escapes(list[index], key)
+  end
+  return list
+end
+
+local function path_list(value, key, plural, singular)
+  local list = cmake_text_list(value, key, plural, singular)
   if list == nil then return nil end
   for index = 1, #list do
     if climbs_out(list[index]) then
@@ -67,6 +116,9 @@ local function scalar_version(value, key)
   if kind ~= "string" then
     error('"' .. key .. '" must be a version such as "17", not a ' .. kind, 0)
   end
+  if string.match(value, "^[%w%.%+%-]+$") == nil then
+    error(string.format('"%s" must be a version such as "17", and "%s" is not', key, value), 0)
+  end
   return value
 end
 
@@ -80,10 +132,9 @@ local function target_of(project)
   return last
 end
 
--- The third accessor that knows about the generate-versus-run asymmetry, and
--- the property that matters is that all of them live in this file.
 local function resolved_of(context)
-  return context.toolchain ~= nil and context.toolchain.dependencies or context.dependencies
+  if context.toolchain ~= nil then return context.toolchain.dependencies end
+  return context.dependencies
 end
 
 local function dependencies_of(context)
@@ -107,13 +158,40 @@ local function dependencies_of(context)
       error(string.format('the package "%s" is not usable as a CMake target name',
                           block.package), 0)
     end
+    -- The digest and the url land in the same generated statement the package
+    -- name does, so validating only the name closes one field of three.
+    if string.match(block.sha256, "^%x+$") == nil or #block.sha256 ~= 64 then
+      error(string.format('modules.%s.cmake has a "sha256" that is not 64 hex digits: "%s"',
+                          entry.module, block.sha256), 0)
+    end
+    if escapes_cmake(block.url) then
+      error(string.format('modules.%s.cmake has a "url" carrying a CMake metacharacter: "%s"',
+                          entry.module, block.url), 0)
+    end
     out[#out + 1] = { package = block.package, url = block.url, sha256 = block.sha256 }
   end
   return out
 end
 
+local function reject_unknown_keys(config)
+  for key in pairs(config) do
+    if KNOWN_KEYS[key] == nil then
+      error(string.format('"%s" is not a key this toolchain knows: a misspelled key would'
+                          .. ' otherwise be ignored and build the wrong thing silently', key), 0)
+    end
+  end
+end
+
+local function default_sources(language)
+  local defaults = DEFAULT_SOURCES[language]
+  local copy = {}
+  for index = 1, #defaults do copy[index] = defaults[index] end
+  return copy
+end
+
 local function read(context)
   local config = config_of(context)
+  reject_unknown_keys(config)
 
   local language = config.language or "c"
   if LANGUAGES[language] == nil then
@@ -125,14 +203,17 @@ local function read(context)
     error('"kind" must be "executable" or "library", not "' .. tostring(kind) .. '"', 0)
   end
 
-  local sources = path_list(config.sources, "sources", "globs") or DEFAULT_SOURCES
+  local sources = path_list(config.sources, "sources", "globs", "glob")
+                  or default_sources(language)
   if #sources == 0 then
     error('"sources" is empty, so there is nothing to compile', 0)
   end
 
   local build_type = config.buildType
-  if build_type ~= nil and type(build_type) ~= "string" then
-    error('"buildType" must be a string such as "Debug", not a ' .. type(build_type), 0)
+  if build_type ~= nil then
+    if type(build_type) ~= "string" then
+      error('"buildType" must be a string such as "Debug", not a ' .. type(build_type), 0)
+    end
   end
 
   local generator = config.generator
@@ -148,14 +229,14 @@ local function read(context)
     kind = kind,
     target = target_of(context.project),
     sources = sources,
-    includes = path_list(config.includes, "includes", "directories"),
-    defines = string_list(config.defines, "defines", "definitions"),
+    includes = path_list(config.includes, "includes", "directories", "directory"),
+    defines = cmake_text_list(config.defines, "defines", "definitions", "definition"),
     standard = scalar_version(config.standard, "standard"),
     buildType = build_type or "Debug",
     generator = generator,
-    configureArgs = string_list(config.configureArgs, "configureArgs", "arguments"),
-    buildArgs = string_list(config.buildArgs, "buildArgs", "arguments"),
-    runArgs = string_list(config.runArgs, "runArgs", "arguments"),
+    configureArgs = string_list(config.configureArgs, "configureArgs", "arguments", "argument"),
+    buildArgs = string_list(config.buildArgs, "buildArgs", "arguments", "argument"),
+    runArgs = string_list(config.runArgs, "runArgs", "arguments", "argument"),
     dependencies = dependencies_of(context),
     root = context.root,
   }

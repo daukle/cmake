@@ -1,1 +1,1 @@
-"defines" must be a list
+"defines" must be a list of definitions

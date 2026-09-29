@@ -5,6 +5,27 @@ local function render(spec)
     return string.format('"${CMAKE_CURRENT_SOURCE_DIR}/%s/%s"', spec.root, relative)
   end
 
+  --- @implNote CONFIGURE_DEPENDS re-globs at build time. Without it a new
+  --- source file is invisible until someone reconfigures, which this project
+  --- has on record as a trap rather than a preference.
+  local function put_source_glob()
+    put("file(GLOB DAUKLE_SOURCES CONFIGURE_DEPENDS")
+    for index = 1, #spec.sources do
+      put("     " .. source_path(spec.sources[index]))
+    end
+    put(")")
+  end
+
+  --- @implNote No verb can execute a binary the build produced, so CMake
+  --- launches it. add_dependencies orders it: a DEPENDS clause on
+  --- add_custom_target names files, not targets, and would let run execute a
+  --- stale binary. VERBATIM is the only portable escaping for the command.
+  local function put_run_target()
+    put(string.format('add_custom_target(run COMMAND "$<TARGET_FILE:%s>" USES_TERMINAL VERBATIM)',
+                      spec.target))
+    put(string.format("add_dependencies(run %s)", spec.target))
+  end
+
   put("cmake_minimum_required(VERSION 3.20)")
   put(string.format("project(%s LANGUAGES %s)", spec.target, spec.cmake_language))
   put("")
@@ -13,21 +34,14 @@ local function render(spec)
     put("include(FetchContent)")
     for index = 1, #spec.dependencies do
       local entry = spec.dependencies[index]
-      put(string.format('FetchContent_Declare(%s URL "%s" URL_HASH SHA256=%s)',
+      put(string.format('FetchContent_Declare(%s URL "%s" URL_HASH "SHA256=%s")',
                         entry.package, entry.url, entry.sha256))
       put(string.format("FetchContent_MakeAvailable(%s)", entry.package))
     end
     put("")
   end
 
-  -- CONFIGURE_DEPENDS re-globs at build time. Without it a new source file is
-  -- invisible until someone reconfigures, which this project has on record as
-  -- a trap rather than a preference.
-  put("file(GLOB DAUKLE_SOURCES CONFIGURE_DEPENDS")
-  for index = 1, #spec.sources do
-    put("     " .. source_path(spec.sources[index]))
-  end
-  put(")")
+  put_source_glob()
   put("")
 
   if spec.kind == "library" then
@@ -61,19 +75,14 @@ local function render(spec)
   end
 
   if spec.standard ~= nil then
-    put(string.format("set_target_properties(%s PROPERTIES %s %s %s_REQUIRED ON)",
+    put(string.format('set_target_properties(%s PROPERTIES %s "%s" %s_REQUIRED ON)',
                       spec.target, spec.standard_property, spec.standard,
                       spec.standard_property))
   end
 
   if spec.kind == "executable" then
     put("")
-    -- No verb can execute a binary the build produced, so CMake launches it.
-    -- add_dependencies orders it: a DEPENDS clause on add_custom_target names
-    -- files, not targets, and would let run execute a stale binary.
-    put(string.format('add_custom_target(run COMMAND "$<TARGET_FILE:%s>" USES_TERMINAL)',
-                      spec.target))
-    put(string.format("add_dependencies(run %s)", spec.target))
+    put_run_target()
   end
 
   return table.concat(out, "\n") .. "\n"

@@ -9,7 +9,8 @@ cmake = "./plugins/cmake"
 
 [toolchains.cmake]
 version = "4.4"
+buildType = "Release"
 configureArgs = [
   "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=out",
-  "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG=out",
+  "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE=out",
 ]

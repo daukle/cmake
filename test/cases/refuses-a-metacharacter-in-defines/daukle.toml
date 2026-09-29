@@ -9,7 +9,4 @@ cmake = "./plugins/cmake"
 
 [toolchains.cmake]
 version = "4.4"
-configureArgs = [
-  "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=out",
-  "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG=out",
-]
+defines = ["A\") \nmessage(FATAL_ERROR \"x"]

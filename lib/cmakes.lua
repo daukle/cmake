@@ -33,23 +33,30 @@ local DIGESTS = {
 
 local BASE = "https://github.com/Kitware/CMake/releases/download/v%s/%s"
 
+-- An explicit branch rather than "windows and A[x] or B[x]", which would fall
+-- back to the non-Windows spelling for a missing Windows row and reintroduce
+-- exactly the coincidence the table above exists to avoid.
+local function spelled_arch(host_os, arch)
+  if host_os == "windows" then return WINDOWS_ARCH[arch] end
+  return ASSET_ARCH[arch]
+end
+
 local function asset_name(host_os, arch, full)
   if host_os == "macos" then
     return string.format("cmake-%s-macos-universal.tar.gz", full)
   end
-  local spelled = host_os == "windows" and WINDOWS_ARCH[arch] or ASSET_ARCH[arch]
-  return string.format("cmake-%s-%s-%s.%s", full, host_os, spelled, EXTENSIONS[host_os])
+  return string.format("cmake-%s-%s-%s.%s", full, host_os,
+                       spelled_arch(host_os, arch), EXTENSIONS[host_os])
 end
 
 local function home_of(host_os, arch, full)
   if host_os == "macos" then
     return string.format(HOMES.macos, full)
   end
-  local spelled = host_os == "windows" and WINDOWS_ARCH[arch] or ASSET_ARCH[arch]
-  return string.format(HOMES[host_os], full, spelled)
+  return string.format(HOMES[host_os], full, spelled_arch(host_os, arch))
 end
 
-local function for_host(request)
+local function assert_host(request)
   local host_os, arch, version = request.os, request.arch, request.version
   local full = RELEASES[version]
   if full == nil then
@@ -71,4 +78,4 @@ local function for_host(request)
   }
 end
 
-return { for_host = for_host }
+return { assert_host = assert_host }

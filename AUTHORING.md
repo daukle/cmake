@@ -26,7 +26,7 @@ version = "4.4"
 | `version` | required | which pinned CMake to provision |
 | `language` | `"c"` | `"c"` or `"c++"` |
 | `kind` | `"executable"` | `"executable"` or `"library"` |
-| `sources` | `["src/*.c"]` | globs, relative to the project, resolved with `CONFIGURE_DEPENDS` |
+| `sources` | per language | globs, relative to the project, resolved with `CONFIGURE_DEPENDS`. `c` defaults to `["src/*.c"]`, `c++` to `["src/*.cpp", "src/*.cc", "src/*.cxx"]` |
 | `includes` | none | directories added as `PRIVATE` include paths |
 | `defines` | none | compile definitions |
 | `standard` | none | the language standard, e.g. `17` |
@@ -40,6 +40,15 @@ range would mean resolving a version it has no digest for.
 
 Paths in `sources` and `includes` may not climb out of the project. An absolute path, a path
 holding `..`, and a backslash are all refused.
+
+**A key this toolchain does not know is refused, not ignored.** `buildtype` instead of `buildType`
+would otherwise build the wrong thing in silence.
+
+**Anything interpolated into the generated file is refused if it carries a CMake metacharacter**
+(`"`, `\`, `$`, `)`, `;`, or a newline). That covers `sources`, `includes`, `defines` and
+`standard`, plus a dependency's `url` and `sha256`. It deliberately does **not** cover
+`configureArgs`, `buildArgs` or `runArgs`: those reach the process as argv and never enter the
+generated file, which is exactly why they are the escape hatch for anything the rule refuses.
 
 ## What you must have installed
 
@@ -87,7 +96,13 @@ A resolved module's `cmake` block becomes one `FetchContent_Declare` plus one
 **`sha256` is required here, and optional in `daukle/c`.** The difference is deliberate:
 `daukle/c` edits a region of a file you wrote and read, so an unverified download is at least
 visible in your own tree. This plugin writes a file you are told not to read, so an unverified
-download would be invisible. `package` must be usable as a CMake target name.
+download would be invisible. It must be exactly 64 hex digits, `package` must be usable as a
+CMake target name, and `url` may carry no CMake metacharacter: all three land in the same
+generated statement, so validating only one of them would close one field of three.
+
+`target_link_libraries` uses the `package` name as the target name, which assumes the fetched
+project exports a target called that. Nothing here verifies it: the dependency case is
+generation-only, because its fixture url is not fetchable.
 
 ## Tasks
 
@@ -142,3 +157,6 @@ fail on Windows for a reason that has nothing to do with the plugin.
 **This plugin is verified on Windows only.** Nothing has been pushed, so CI has never run. The
 Linux `tar.gz` path, the macOS `CMake.app/Contents` home, and the `make` dependency on both are
 exercised by nothing.
+
+**`generator` is validated but never exercised.** A positive case would have to name a real
+generator, which differs per platform, so the `-G` emission is covered by no test.

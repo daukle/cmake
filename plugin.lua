@@ -8,14 +8,14 @@ daukle.toolchain{
   name = "cmake",
   generate = function(context)
     local spec = manifest.read(context)
-    cmakes.for_host{ os = context.host.os, arch = context.host.arch, version = spec.version }
+    cmakes.assert_host{ os = context.host.os, arch = context.host.arch, version = spec.version }
     return { ["CMakeLists.txt"] = generate.render(spec) }
   end,
 }
 
 local function provision_cmake(context, spec)
-  local pick = cmakes.for_host{ os = context.host.os, arch = context.host.arch,
-                                version = spec.version }
+  local pick = cmakes.assert_host{ os = context.host.os, arch = context.host.arch,
+                                   version = spec.version }
   local root = daukle.provision{
     url = pick.url,
     sha256 = pick.sha256,
@@ -51,9 +51,8 @@ daukle.task{
   run = function(context)
     local spec = manifest.read(context)
     local cmake = provision_cmake(context, spec)
-    -- Both the cache variable at configure and --config here are always passed,
-    -- and exactly one takes effect: a single-config generator honours the first
-    -- and ignores the second, a multi-config generator does the reverse.
+    -- Exactly one of the configure-time cache variable and --config takes
+    -- effect, and which one depends on the generator, so both are always sent.
     daukle.exec(cmake, append({ "--build", "_b", "--config", spec.buildType }, spec.buildArgs))
   end,
 }
