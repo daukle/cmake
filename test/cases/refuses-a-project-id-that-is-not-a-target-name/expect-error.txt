@@ -1,0 +1,1 @@
+is not usable as a CMake target name

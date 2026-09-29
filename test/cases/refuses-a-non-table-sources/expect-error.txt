@@ -1,0 +1,1 @@
+"sources" must be a list of globs
