@@ -1,0 +1,1 @@
+this plugin pins its CMake releases
