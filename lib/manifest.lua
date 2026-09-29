@@ -80,6 +80,38 @@ local function target_of(project)
   return last
 end
 
+-- The third accessor that knows about the generate-versus-run asymmetry, and
+-- the property that matters is that all of them live in this file.
+local function resolved_of(context)
+  return context.toolchain ~= nil and context.toolchain.dependencies or context.dependencies
+end
+
+local function dependencies_of(context)
+  local resolved = resolved_of(context)
+  local out = {}
+  if resolved == nil then return out end
+  for index = 1, #resolved do
+    local entry = resolved[index]
+    local block = entry.block or {}
+    if type(block.package) ~= "string" or type(block.url) ~= "string" then
+      error(string.format('modules.%s.cmake needs "package" and "url"', entry.module), 0)
+    end
+    -- Required here where daukle/c leaves it optional: that plugin edits a file
+    -- the user reads, and this one writes a file they are told not to.
+    if type(block.sha256) ~= "string" then
+      error(string.format('modules.%s.cmake needs a "sha256": a generated file is one'
+                          .. ' nobody reads, so an unverified download would be invisible',
+                          entry.module), 0)
+    end
+    if string.match(block.package, "^[%w_%-]+$") == nil then
+      error(string.format('the package "%s" is not usable as a CMake target name',
+                          block.package), 0)
+    end
+    out[#out + 1] = { package = block.package, url = block.url, sha256 = block.sha256 }
+  end
+  return out
+end
+
 local function read(context)
   local config = config_of(context)
 
@@ -124,6 +156,7 @@ local function read(context)
     configureArgs = string_list(config.configureArgs, "configureArgs", "arguments"),
     buildArgs = string_list(config.buildArgs, "buildArgs", "arguments"),
     runArgs = string_list(config.runArgs, "runArgs", "arguments"),
+    dependencies = dependencies_of(context),
     root = context.root,
   }
 end

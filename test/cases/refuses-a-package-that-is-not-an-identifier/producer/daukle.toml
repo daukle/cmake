@@ -1,0 +1,10 @@
+schema = 1
+project = "forebay/basekit"
+version = "5.0.0"
+
+[modules.ir]
+
+  [modules.ir.cmake]
+  package = "x) execute_process("
+  url = "https://example.test/ir.tar.gz"
+  sha256 = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"

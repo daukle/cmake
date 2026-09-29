@@ -9,6 +9,17 @@ local function render(spec)
   put(string.format("project(%s LANGUAGES %s)", spec.target, spec.cmake_language))
   put("")
 
+  if #spec.dependencies > 0 then
+    put("include(FetchContent)")
+    for index = 1, #spec.dependencies do
+      local entry = spec.dependencies[index]
+      put(string.format('FetchContent_Declare(%s URL "%s" URL_HASH SHA256=%s)',
+                        entry.package, entry.url, entry.sha256))
+      put(string.format("FetchContent_MakeAvailable(%s)", entry.package))
+    end
+    put("")
+  end
+
   -- CONFIGURE_DEPENDS re-globs at build time. Without it a new source file is
   -- invisible until someone reconfigures, which this project has on record as
   -- a trap rather than a preference.
@@ -23,6 +34,13 @@ local function render(spec)
     put(string.format("add_library(%s ${DAUKLE_SOURCES})", spec.target))
   else
     put(string.format("add_executable(%s ${DAUKLE_SOURCES})", spec.target))
+  end
+
+  if #spec.dependencies > 0 then
+    local names = {}
+    for index = 1, #spec.dependencies do names[index] = spec.dependencies[index].package end
+    put(string.format("target_link_libraries(%s PRIVATE %s)",
+                      spec.target, table.concat(names, " ")))
   end
 
   if spec.includes ~= nil and #spec.includes > 0 then

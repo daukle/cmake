@@ -1,0 +1,9 @@
+schema = 1
+project = "forebay/basekit"
+version = "5.0.0"
+
+[modules.ir]
+
+  [modules.ir.cmake]
+  package = "basekit-ir"
+  url = "https://example.test/ir.tar.gz"
