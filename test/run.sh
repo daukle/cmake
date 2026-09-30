@@ -81,8 +81,9 @@ run_case() {
         continue
       fi
       # A task provisions a real CMake and needs a compiler and make on the
-      # host. It runs by default only on Linux, where one CI job pays for the
-      # download and the toolchain cache keeps later runs free.
+      # host, so a bare local run on a developer's machine does not pay for the
+      # download unasked. CI sets DAUKLE_CMAKE_E2E on every runner, because the
+      # macOS home layout and the Windows zip are exercised by nothing else.
       if [ "$(uname -s)" != "Linux" ] && [ "${DAUKLE_CMAKE_E2E:-}" != "1" ]; then
         echo "skip $name/$manifest_name: set DAUKLE_CMAKE_E2E=1 to run it here" >&2
         skipped=$((skipped + 1))
