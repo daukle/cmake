@@ -1,0 +1,10 @@
+schema = 1
+project = "forebay/basekit"
+version = "5.0.0"
+
+[modules.ir]
+
+  [modules.ir.cmake]
+  package = "basekit-ir"
+  url = "@URL@"
+  sha256 = "@SHA256@"

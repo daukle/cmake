@@ -57,6 +57,18 @@ run_case() {
            "$sandbox/expect-task-error.txt"
     stage_plugin "$sandbox"
 
+    # A case whose manifest has to carry a digest of something on disk builds
+    # that something here instead of committing it, because git rewriting a
+    # line ending would silently stop the digest matching.
+    if [ -f "$sandbox/setup.sh" ]; then
+      if ! (cd "$sandbox" && sh ./setup.sh >setup-log.txt 2>&1); then
+        fail "$name/$manifest_name" "setup.sh failed"
+        sed -n '1,20p' "$sandbox/setup-log.txt" >&2
+        continue
+      fi
+      rm -f "$sandbox/setup-log.txt"
+    fi
+
     if [ -f "$case_dir/expect-error.txt" ]; then
       if (cd "$sandbox" && "$daukle" sync "$manifest_name" >stdout.txt 2>stderr.txt); then
         fail "$name/$manifest_name" "expected a failure, got success"
