@@ -61,6 +61,11 @@ generated file, which is exactly why they are the escape hatch for anything the 
 Ninja needs the environment `vcvarsall.bat` produces, a plugin cannot produce it, and CMake's
 default generator does not need it. This is why the plugin names no generator unless you name one.
 
+A positive case cannot name a real generator, because which ones exist differs per platform.
+`names-a-generator-cmake-cannot-create` covers the `-G` emission instead: only CMake's own
+generator lookup says "Could not create named generator", so the refusal proves the value reached
+the command line.
+
 ## The compiler is CMake's choice, and daukle reports nothing about it
 
 daukle's tool report lists what `daukle.provision` or `daukle.tool` resolved. The compiler is
@@ -101,8 +106,11 @@ CMake target name, and `url` may carry no CMake metacharacter: all three land in
 generated statement, so validating only one of them would close one field of three.
 
 `target_link_libraries` uses the `package` name as the target name, which assumes the fetched
-project exports a target called that. Nothing here verifies it: the dependency case is
-generation-only, because its fixture url is not fetchable.
+project exports a target called that. `links-a-dependency-it-fetches` verifies it end to end: the
+archive is built and digested by the case's own `setup.sh`, so the fetch, the digest check, the
+subbuild, the link and the include propagation are all real, and `cmake:run` executes the result
+rather than asserting a file. `links-a-resolved-dependency` keeps its unfetchable fixture url and
+remains the byte-exact generation case.
 
 ## Tasks
 
@@ -133,6 +141,12 @@ would be testing the stub.
 - a case with `task.txt` runs that task, and asserts `produces.txt` or `expect-task-error.txt`
 - every success case is synced **twice** and must match after both
 - a case whose `expected/` is empty is a failure, not a pass
+- a case with `setup.sh` runs it in the sandbox first, so a manifest can carry a digest of
+  something the case builds at test time rather than one committed beside it
+
+A fixture a case digests must be written **outside** the sandbox, because daukle refuses a
+generated file that carries the project root and the url lands in `CMakeLists.txt` verbatim. The
+root is matched as a substring, so a name merely suffixed with the sandbox's still carries it.
 
 ```sh
 DAUKLE=/path/to/daukle sh test/run.sh
@@ -154,9 +168,5 @@ fail on Windows for a reason that has nothing to do with the plugin.
 
 ## Limits
 
-**This plugin is verified on Windows only.** Nothing has been pushed, so CI has never run. The
-Linux `tar.gz` path, the macOS `CMake.app/Contents` home, and the `make` dependency on both are
-exercised by nothing.
-
-**`generator` is validated but never exercised.** A positive case would have to name a real
-generator, which differs per platform, so the `-G` emission is covered by no test.
+The compiler a build uses is reported by nothing. That is this plugin's stated narrowing rather
+than a gap: CMake picks it, and nothing here asks which.
