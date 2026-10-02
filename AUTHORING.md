@@ -14,13 +14,29 @@ build file, provisions CMake and runs it.
 
 `deps.lua` is a **dependency writer**: it edits a `CMakeLists.txt` that YOU own and maintain,
 writing a `FetchContent` block into a `# daukle:begin` region, and it needs CMake already
-installed. Reach it by naming the asset:
+installed. Reach it with a SECOND resolver, because **`asset` is a key of the resolver, not of
+the plugin entry**:
 
 ```toml
+[resolvers.github]
+url = "https://raw.githubusercontent.com/daukle/daukle/<rev>/plugins/github-releases.lua"
+sha256 = "..."
+
+[resolvers.github-deps]
+url = "https://raw.githubusercontent.com/daukle/daukle/<rev>/plugins/github-releases.lua"
+sha256 = "..."
+asset = "deps.lua"
+
 [plugins]
-cmake      = { resolver = "github", coordinate = "daukle/cmake@^1" }
-cmake-deps = { resolver = "github", coordinate = "daukle/cmake@^1", asset = "deps.lua" }
+cmake      = { resolver = "github",      coordinate = "daukle/cmake@^1.0.0" }
+cmake-deps = { resolver = "github-deps", coordinate = "daukle/cmake@^1.0.0" }
 ```
+
+Two things here were measured on 2026-10-02 rather than assumed, and both bite silently.
+**An `asset` written on a `[plugins]` entry is accepted and ignored**: daukle hands the resolver
+the RESOLVER's block, so the key never arrives, the default `plugin.lua` is fetched, and you get
+the toolchain where you asked for the writer with no error at all. **And the range needs a full
+version**: `@^1` is refused, `@^1.0.0` is not.
 
 They are two artifacts rather than two declarations in one chunk because **core refuses it**:
 a chunk holding `exec` or `provision` may not declare `daukle.language` at all. A plugin is a
