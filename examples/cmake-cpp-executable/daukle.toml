@@ -1,0 +1,14 @@
+schema = 1
+project = "daukle/example-cmake-cpp-executable"
+version = "1.0.0"
+
+[modules]
+
+[plugins]
+cmake = "./plugins/cmake"
+
+[toolchains.cmake]
+version = "4.4"
+language = "c++"
+standard = 20
+defines = ["EXAMPLE_GREETING=1"]
