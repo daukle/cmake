@@ -5,6 +5,29 @@ validates the `[toolchains.cmake]` block into a spec; `lib/generate` renders tha
 `CMakeLists.txt`; `lib/cmakes` holds the pinned archive table. Only `lib/manifest` reads
 `context.config` or `context.toolchain`.
 
+## This repository publishes two plugins
+
+A release carries two assets, and they are different plugins with different jobs.
+
+`plugin.lua` is the **managed toolchain** this document is about: daukle owns the generated
+build file, provisions CMake and runs it.
+
+`deps.lua` is a **dependency writer**: it edits a `CMakeLists.txt` that YOU own and maintain,
+writing a `FetchContent` block into a `# daukle:begin` region, and it needs CMake already
+installed. Reach it by naming the asset:
+
+```toml
+[plugins]
+cmake      = { resolver = "github", coordinate = "daukle/cmake@^1" }
+cmake-deps = { resolver = "github", coordinate = "daukle/cmake@^1", asset = "deps.lua" }
+```
+
+They are two artifacts rather than two declarations in one chunk because **core refuses it**:
+a chunk holding `exec` or `provision` may not declare `daukle.language` at all. A plugin is a
+managed toolchain or a dependency writer, never both. `deps.lua` lived in `daukle/c` until
+1.0.1, where it was misfiled: it is about CMake's syntax and CMake's dependency mechanism,
+and about C only in the sense that CMake is mostly used for C.
+
 ## What this plugin owns
 
 One generated `CMakeLists.txt` under `build/daukle/cmake/`, and nothing in your tree. A repository
@@ -116,6 +139,15 @@ remains the byte-exact generation case.
 
 `cmake:configure`, `cmake:build` (depends on configure) and `cmake:run` (depends on build).
 `cmake:run` on a `kind = "library"` project is an error, not a no-op.
+
+`cmake:build` and `cmake:run` are named through `daukle/lifecycle`, which this plugin requires
+and which checks each declaration against the contract its name promises. `cmake:configure` is
+not a lifecycle name and stays a literal: it is this toolchain's own step, not a standard one.
+
+**A base and its dependents release in lockstep.** The `requires` entry for `daukle/lifecycle`
+is a url and a sha256, so there is no range and no resolution: any lifecycle release that
+changes `lib/names` needs a new release of THIS plugin to adopt it. That is the price of a
+transitive pin and it is deliberate.
 
 **No task declares `partOf`.** No plugin in this org declares `build`, and a `partOf` naming an
 undeclared task is an error naming both, which would make this plugin unusable standalone. Wire it

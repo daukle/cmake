@@ -1,0 +1,8 @@
+schema = 1
+project = "forebay/basekit"
+version = "5.0.0"
+
+[modules.ir]
+
+  [modules.ir.c]
+  package = "basekit-ir"

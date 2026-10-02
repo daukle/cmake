@@ -1,0 +1,15 @@
+schema = 1
+project = "forebay/basekit"
+version = "5.0.0"
+
+[modules.contracts]
+
+  [modules.contracts.c]
+  package = "basekit-contracts"
+  url = "https://example.test/contracts.tar.gz"
+
+[modules.ir]
+
+  [modules.ir.c]
+  package = "basekit-ir"
+  url = "https://example.test/ir.tar.gz"

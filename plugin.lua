@@ -1,5 +1,18 @@
-daukle.plugin{ api = 1, uses = { "provision", "exec" } }
+daukle.plugin{
+  api = 1,
+  uses = { "provision", "exec" },
+  requires = {
+    lifecycle = {
+      url = "https://github.com/daukle/lifecycle/releases/download/1.0.0/plugin.lua",
+      sha256 = "cc6b7bded429c0259db4c84f450b5f47f8202a75fe5944188037475d77d3d60d",
+    },
+  },
+}
 
+-- A base and its dependents release in lockstep: this digest is the whole of
+-- the pin, so any lifecycle release that changes lib/names needs a release
+-- here to adopt it. See AUTHORING.md.
+local names = daukle.require("lifecycle:lib/names")
 local manifest = daukle.require("lib/manifest")
 local cmakes = daukle.require("lib/cmakes")
 local generate = daukle.require("lib/generate")
@@ -45,8 +58,8 @@ daukle.task{
   end,
 }
 
-daukle.task{
-  name = "cmake:build",
+daukle.task(names.assert_contract(names.BUILD, {
+  name = names.qualify("cmake", names.BUILD),
   dependsOn = { "cmake:configure" },
   run = function(context)
     local spec = manifest.read(context)
@@ -55,11 +68,11 @@ daukle.task{
     -- effect, and which one depends on the generator, so both are always sent.
     daukle.exec(cmake, append({ "--build", "_b", "--config", spec.buildType }, spec.buildArgs))
   end,
-}
+}))
 
-daukle.task{
-  name = "cmake:run",
-  dependsOn = { "cmake:build" },
+daukle.task(names.assert_contract(names.RUN, {
+  name = names.qualify("cmake", names.RUN),
+  dependsOn = { names.qualify("cmake", names.BUILD) },
   run = function(context)
     local spec = manifest.read(context)
     if spec.kind ~= "executable" then
@@ -69,4 +82,4 @@ daukle.task{
     daukle.exec(cmake, append({ "--build", "_b", "--target", "run",
                                 "--config", spec.buildType }, spec.runArgs))
   end,
-}
+}))
