@@ -1,0 +1,23 @@
+schema = 1
+project = "example/app"
+version = "1.0.0"
+
+[modules]
+
+[sources."forebay/basekit"]
+kind = "fixture"
+path = "./producer"
+
+[plugins]
+fixture = "./plugins/fixture.lua"
+deps = "./plugins/cmake-deps.lua"
+
+[[consumers]]
+id = "native"
+language = "c"
+file = "CMakeLists.txt"
+configuration = ""
+
+  [consumers.dependencies."forebay/basekit"]
+  version = "^5.0.0"
+  modules = ["ir"]

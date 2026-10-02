@@ -40,6 +40,10 @@ stage_plugin() {
   if [ -d "$root/lib" ]; then
     cp -R "$root/lib" "$1/plugins/cmake/lib"
   fi
+  # The dependency writer is a second artifact of this repository rather than
+  # a second declaration in the chunk above: core refuses a chunk holding exec
+  # or provision to declare daukle.language at all.
+  cp "$root/deps.lua" "$1/plugins/cmake-deps.lua"
 }
 
 run_case() {
