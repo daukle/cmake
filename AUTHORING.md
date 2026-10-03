@@ -71,6 +71,7 @@ version = "4.4"
 | `standard` | none | the language standard, e.g. `17` |
 | `buildType` | `"Debug"` | the CMake build type |
 | `generator` | none | passed to `-G`; see the generator note below |
+| `compiler` | none | a `daukle/c` clang version, e.g. `"21"`. Provisions that compiler AND Ninja and drives the build with both; see below |
 | `configureArgs`, `buildArgs`, `runArgs` | none | passed through verbatim |
 
 `version` is a pinned `major.minor`, and **a range is refused**. `">=4.0"` and `"^4.4"` are both
@@ -91,14 +92,57 @@ generated file, which is exactly why they are the escape hatch for anything the 
 
 ## What you must have installed
 
-**CMake is provisioned. A compiler and a build tool are not.**
+**By default, CMake is provisioned and a compiler and a build tool are not.**
 
 - On Linux and macOS, **`make` must be installed**, along with a C or C++ compiler.
 - On Windows, a Visual Studio installation is enough; CMake's default generator finds MSVC unaided.
 
-**Do not set `generator = "Ninja"` on Windows** expecting it to work outside a developer prompt.
-Ninja needs the environment `vcvarsall.bat` produces, a plugin cannot produce it, and CMake's
-default generator does not need it. This is why the plugin names no generator unless you name one.
+**`compiler` removes both prerequisites**, and the section below is what it costs.
+
+**Do not set `generator = "Ninja"` on Windows while using the HOST's compiler**, expecting it to
+work outside a developer prompt. Ninja then drives MSVC, which needs the environment
+`vcvarsall.bat` produces, a plugin cannot produce it, and CMake's default generator does not need
+it. **That is true of MSVC and not of Windows**: with `compiler` set, Ninja drives a provisioned
+clang that needs no such environment, which was measured in a plain shell with no Visual Studio
+present. This is why the plugin names no generator unless you name one, or unless `compiler` does.
+
+## `compiler`, which provisions the whole toolchain
+
+```toml
+[toolchains.cmake]
+version = "4.4"
+compiler = "21"
+```
+
+Nothing else needs to be installed. The plugin provisions CMake, the clang that `daukle/c` pins,
+and Ninja, then configures with `-G Ninja`, `CMAKE_MAKE_PROGRAM` and `CMAKE_C_COMPILER`.
+
+**The three are one decision and the key does not let you take them apart.** A provisioned compiler
+is unreachable without a generator that honours `CMAKE_C_COMPILER`, and every such generator needs
+a build program the host does not have. So:
+
+- **`generator` alongside `compiler` is refused**, rather than one silently winning. CMake's Visual
+  Studio generator **ignores `CMAKE_C_COMPILER` entirely**: pointing it at a compiler that does not
+  exist still configures, builds and runs, with MSVC and no warning. That measurement is the reason
+  this key exists in this shape.
+- **`language = "c++"` alongside `compiler` is refused.** The provisioned `clang++` links `libc++`
+  and `libunwind` out of the toolchain's own directory inside daukle's cache, so the binary it
+  produces does not start anywhere else. `-static` fixes it and changes what your artifact is,
+  which is your decision and not this plugin's to take quietly.
+
+**What it costs.** The clang archive is large (roughly 1.4 GiB expanded on Windows), cached per
+digest. On Windows the compiler is **MinGW ABI** (`x86_64-w64-windows-gnu`), so its output does not
+link against anything MSVC produced; the C binaries it makes import only `KERNEL32.dll` and the
+Universal CRT, both of which ship with Windows.
+
+**This plugin now requires `daukle/c`**, whose asset is fetched for every consumer whether or not
+`compiler` is set, the same way `daukle/lifecycle` already is. The alias is **`cc` and not `c`**:
+core refuses a one-letter alias, because a letter before a colon is a Windows drive letter and
+`daukle.require("c:...")` could never reach it.
+
+**Ninja's digests are COMPUTED, not transcribed.** ninja-build publishes no checksum beside its
+assets, so `lib/drivers` is a weaker pin than `lib/cmakes`: it is only as good as the download it
+came from. Retake it from the forge, never from a working tree.
 
 A positive case cannot name a real generator, because which ones exist differs per platform.
 `names-a-generator-cmake-cannot-create` covers the `-G` emission instead: only CMake's own

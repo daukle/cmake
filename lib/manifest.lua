@@ -10,6 +10,7 @@ local KNOWN_KEYS = {
   version = true, language = true, kind = true, sources = true, includes = true,
   defines = true, standard = true, buildType = true, generator = true,
   configureArgs = true, buildArgs = true, runArgs = true, dependencies = true,
+  compiler = true,
 }
 
 local function config_of(context)
@@ -221,6 +222,29 @@ local function read(context)
     error('"generator" must be a string, not a ' .. type(generator), 0)
   end
 
+  local compiler = scalar_version(config.compiler, "compiler")
+  -- Refused rather than resolved in the plugin's favour: Ninja is the only
+  -- generator that both honours CMAKE_C_COMPILER and needs no build program
+  -- the host must supply, so there is no generator left to honour. Visual
+  -- Studio accepts the variable and silently compiles with MSVC instead, which
+  -- is the defect this whole key exists around.
+  if compiler ~= nil and generator ~= nil then
+    error('"compiler" provisions a compiler and drives it with Ninja, so it cannot also honour'
+          .. ' "generator": CMake\'s Visual Studio generator ignores the compiler it is given,'
+          .. ' and the others need a build program this plugin does not provision.'
+          .. ' Remove one of the two keys', 0)
+  end
+  -- The provisioned clang++ links libc++ and libunwind out of the toolchain's
+  -- own directory, so the binary runs only where that directory is. Refused
+  -- until someone decides whether this plugin may link them statically, which
+  -- changes what the user's artifact is.
+  if compiler ~= nil and language == "c++" then
+    error('"compiler" cannot be used with language "c++": the provisioned clang++ links its C++'
+          .. ' runtime from inside daukle\'s cache, so the binary it produces does not start'
+          .. ' anywhere else. Use language "c", or drop "compiler" and build with the'
+          .. ' host\'s compiler', 0)
+  end
+
   return {
     version = version_of(context),
     language = language,
@@ -234,6 +258,7 @@ local function read(context)
     standard = scalar_version(config.standard, "standard"),
     buildType = build_type or "Debug",
     generator = generator,
+    compiler = compiler,
     configureArgs = string_list(config.configureArgs, "configureArgs", "arguments", "argument"),
     buildArgs = string_list(config.buildArgs, "buildArgs", "arguments", "argument"),
     runArgs = string_list(config.runArgs, "runArgs", "arguments", "argument"),

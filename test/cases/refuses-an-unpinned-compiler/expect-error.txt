@@ -1,0 +1,1 @@
+no pinned clang for c 99 on this host
