@@ -4,16 +4,17 @@ A managed C project. The repository holds `daukle.toml` and `src/` and **no `CMa
 daukle downloads CMake, verifies it against a digest the plugin pins, generates one
 `CMakeLists.txt` into `build/daukle/cmake/`, and runs CMake over it.
 
-```
-daukle sync           # generates build/daukle/cmake/CMakeLists.txt and nothing in your tree
-daukle cmake:run      # configures, builds and runs, printing "hello from daukle"
+```console
+$ daukle cmake:run
+hello from daukle
 ```
 
-## How this copy differs from your project
+`daukle sync` on its own generates `build/daukle/cmake/CMakeLists.txt` and nothing in your tree.
 
-**It points at the working tree.** The manifest here says `cmake = "./plugins/cmake"` so that this
-repository's suite tests the plugin as it stands, and a red example means a real defect rather than
-a stale release. A real project names a pinned resolver and a coordinate instead:
+## This example is exactly what your project would hold
+
+It names a pinned resolver and a published coordinate, so the directory can be copied anywhere and
+`daukle sync` works:
 
 ```toml
 [resolvers.github]
@@ -21,10 +22,12 @@ url = "https://raw.githubusercontent.com/daukle/daukle/<commit>/plugins/github-r
 sha256 = "..."
 
 [plugins]
-cmake = { resolver = "github", coordinate = "daukle/cmake@^1.0.1" }
+cmake = { resolver = "github", coordinate = "daukle/cmake@^1.0.0" }
 ```
 
-Nothing vendors a copy of the plugin either way.
+Nothing vendors a copy of the plugin. **The suite then runs it twice**: once as committed, against
+the published release, and once with this repository's working tree staged over a copy, so a break
+in the plugin as it stands now reddens this repository rather than waiting for a release.
 
 ## What to look at
 
@@ -71,13 +74,12 @@ near the root of a drive, or use another generator.
 **More than one target.** The modelled surface is one executable or one library. A project with an
 application and a CLI beside it does not fit yet.
 
-## The two `.txt` files, which are harness inputs rather than part of the example
+## The one file that is a harness input rather than part of the example
 
-`task.txt` and `expect-output.txt` are read by `test/run.sh`, not by daukle. `task.txt` holds the
-one task CI runs here, `cmake:run`, and `expect-output.txt` the clause its output must contain,
-`hello from daukle`. They sit beside the example rather than in `test/` so each example
-carries its own expectations. An example with no `task.txt` is checked for its generated files
-and never run.
+`needs-tools` marks this example as one that provisions real tools, which the harness skips unless
+`DAUKLE_EXAMPLE_E2E=1` is set. CI sets it on every runner. The `console` block above is **executed**
+rather than decorative: its `$ ` line is run and the line beneath it must appear in the output, so
+the command and its result cannot drift apart the way a separate expectation file did.
 
 **There is no committed executable here, and nothing is missing.** `cmake:run` really does build and
 run the program; `build/` is gitignored, which is the only reason you cannot see the result in the

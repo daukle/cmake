@@ -3,16 +3,17 @@
 The same managed toolchain as `cmake-c-executable`, in C++, and with two keys that example does not
 use. Read that one first; this one only shows what changes.
 
-```
-daukle cmake:run      # prints "hello from daukle"
+```console
+$ daukle cmake:run
+hello from daukle
 ```
 
-## How this copy differs from your project
+## This example is exactly what your project would hold
 
-**It points at the working tree.** The manifest here says `cmake = "./plugins/cmake"` so that this
-repository's suite tests the plugin as it stands, and a red example means a real defect rather than
-a stale release. A real project names a pinned resolver and `coordinate = "daukle/cmake@^1.0.1"`
-instead. Nothing vendors a copy of the plugin either way.
+It names a pinned resolver and `coordinate = "daukle/cmake@^1.0.0"`, so the directory can be copied
+anywhere and `daukle sync` works. Nothing vendors a copy of the plugin. The suite runs it twice,
+once as committed against the published release and once with this repository's working tree staged
+over a copy.
 
 ## What changes
 
@@ -28,13 +29,11 @@ generated file is C++ from its first line rather than C with a C++ file in it.
 fail this example rather than passing quietly. A test that cannot fail is the failure mode this
 repository is most careful about.
 
-## The two `.txt` files, which are harness inputs rather than part of the example
+## The one file that is a harness input rather than part of the example
 
-`task.txt` and `expect-output.txt` are read by `test/run.sh`, not by daukle. `task.txt` holds the
-one task CI runs here, `cmake:run`, and `expect-output.txt` the clause its output must contain,
-`hello from daukle`. They sit beside the example rather than in `test/` so each example
-carries its own expectations. An example with no `task.txt` is checked for its generated files
-and never run.
+`needs-tools` marks this example as one that provisions real tools, which the harness skips unless
+`DAUKLE_EXAMPLE_E2E=1` is set. CI sets it on every runner. The `console` block above is **executed**
+rather than decorative, which is what makes the `defines` claim above a real assertion.
 
 **There is no committed executable here, and nothing is missing.** `cmake:run` really does build and
 run the program; `build/` is gitignored, which is the only reason you cannot see the result in the
