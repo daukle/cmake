@@ -1,0 +1,1 @@
+is a target key and "targets" is declared, so it has to live on a target

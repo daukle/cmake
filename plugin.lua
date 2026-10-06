@@ -112,6 +112,31 @@ local function append_toolchain(argv, context, spec)
   return argv
 end
 
+--[[ The ambiguity lives here rather than in generation, because a project with
+     two executables and no favourite is a buildable project: refusing it when
+     the file is written would take cmake:build down with cmake:run.
+     @implNote the remedy named is "default" and not a per-target task,
+     because there is no per-target task yet and an error message that names
+     one would be a lie. D-110 carries why: registering one costs every
+     project using this plugin the requirement that its manifest be called
+     daukle.toml, which is a coverage loss to buy a convenience. ]]
+local function refuse_an_unrunnable_project(spec)
+  if spec.default ~= nil then return end
+
+  local runnable = {}
+  for index = 1, #spec.targets do
+    local target = spec.targets[index]
+    if target.kind == "executable" then runnable[#runnable + 1] = target.name end
+  end
+  if #runnable == 0 then
+    error("this project declares no executable target, so there is nothing for cmake:run to run",
+          0)
+  end
+  error('this project declares ' .. #runnable .. ' executable targets, so "cmake:run" does not'
+        .. ' name one: set "default" to the one it should mean, out of '
+        .. table.concat(runnable, ", "), 0)
+end
+
 daukle.task{
   name = "cmake:configure",
   run = function(context)
@@ -140,9 +165,7 @@ daukle.task(names.assert_contract(names.RUN, {
   dependsOn = { names.qualify("cmake", names.BUILD) },
   run = function(context)
     local spec = manifest.read(context)
-    if spec.kind ~= "executable" then
-      error('"kind" is "library", so there is nothing for cmake:run to run', 0)
-    end
+    refuse_an_unrunnable_project(spec)
     local cmake = provision_cmake(context, spec)
     daukle.exec(cmake, append({ "--build", "_b", "--target", "run",
                                 "--config", spec.buildType }, spec.runArgs))

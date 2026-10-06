@@ -9,5 +9,8 @@ file(GLOB DAUKLE_SOURCES CONFIGURE_DEPENDS
 
 add_executable(app ${DAUKLE_SOURCES})
 
+add_custom_target(run-app COMMAND "$<TARGET_FILE:app>" USES_TERMINAL VERBATIM)
+add_dependencies(run-app app)
+
 add_custom_target(run COMMAND "$<TARGET_FILE:app>" USES_TERMINAL VERBATIM)
 add_dependencies(run app)

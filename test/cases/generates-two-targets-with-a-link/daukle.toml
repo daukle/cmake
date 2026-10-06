@@ -1,0 +1,21 @@
+schema = 1
+project = "example/app"
+version = "1.0.0"
+
+[modules]
+
+[plugins]
+cmake = "./plugins/cmake"
+
+[toolchains.cmake]
+version = "4.4"
+
+  [[toolchains.cmake.targets]]
+  name    = "greet"
+  kind    = "library"
+  sources = ["src/lib/*.c"]
+
+  [[toolchains.cmake.targets]]
+  name    = "app"
+  sources = ["src/app/*.c"]
+  links   = ["greet"]

@@ -1,0 +1,1 @@
+they are different CMake targets and the same daukle task "cmake:app"
