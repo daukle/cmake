@@ -62,7 +62,7 @@ version = "4.4"
 
 | key | default | what it does |
 | --- | --- | --- |
-| `version` | required | which pinned CMake to provision |
+| `version` | required | which pinned CMake to provision. **`"4.4"` or `"3.31"`**; see below for why there are two |
 | `language` | `"c"` | `"c"` or `"c++"` |
 | `kind` | `"executable"` | `"executable"` or `"library"` |
 | `sources` | per language | globs, relative to the project, resolved with `CONFIGURE_DEPENDS`. `c` defaults to `["src/*.c"]`, `c++` to `["src/*.cpp", "src/*.cc", "src/*.cxx"]` |
@@ -112,6 +112,29 @@ refused by name. The per-target TASKS do not exist yet; see Limits.
 **`cmake:run` needs to know which binary.** With one executable it is that one. With several, set
 `default`, and without it `cmake:run` refuses and names the candidates. `cmake:build` builds
 everything either way.
+
+### Two CMake lines, and they are a behaviour boundary rather than old and new
+
+**CMake 4 refuses a project whose `cmake_minimum_required` is below 3.5.** Measured 2026-10-06
+against the provisioned binaries, not read in a changelog:
+
+| floor | CMake 4.4.3 | CMake 3.31 |
+| --- | --- | --- |
+| `2.8`, `3.4` | **exit 1, `CMake Error at CMakeLists.txt:1 (cmake_minimum_required)`** | accepted |
+| `3.5` | accepted, with a deprecation warning | accepted, warning |
+| `3.10` and above | accepted | accepted |
+
+The 23 `CMakeLists.txt` files under `F:/Documents/GitHub` declare floors from **2.8 to 4.3**, so a
+plugin pinning 4.4 alone cannot build the oldest **at all**. `3.31` is the last 3.x line and is
+there for exactly those. **Declare `4.4` unless your floor is below 3.5.**
+
+**An old CMake cannot drive a new compiler, and that cuts the other way.** CMake 3.31 predates
+**Visual Studio 18 2026** and carries no generator for it, so on a host whose only toolchain is that
+one it configures nothing: `CMAKE_C_COMPILER not set, after EnableLanguage`. Found on the
+`windows-latest` runner, where 4.4 succeeds against the same installation. **On such a host, pair
+`version = "3.31"` with `compiler`**, which provisions a clang and drives it with Ninja and so
+needs no Visual Studio at all. That is what this repository's own `builds-on-the-pinned-cmake-3`
+case does, for that reason rather than for convenience.
 
 `version` is a pinned `major.minor`, and **a range is refused**. `">=4.0"` and `"^4.4"` are both
 errors: this plugin ships a table of exact releases with their published digests, and matching a
@@ -318,3 +341,8 @@ plugin. **That is a coverage loss to buy a convenience**, so it waits on `D-110`
 practice.
 
 **No install, export or package.** Unmodelled and unmeasured.
+
+**Two CMake lines are pinned, not every release.** The e2e cases provision one; `test/pins.sh`
+covers every row of every release against the `cmake-<version>-SHA-256.txt` Kitware publishes, and
+**fails when a release does not parse to exactly six host rows** rather than skipping what it could
+not read.
