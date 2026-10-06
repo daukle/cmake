@@ -58,7 +58,8 @@ run_case() {
     cp -R "$case_dir" "$sandbox"
     rm -rf "$sandbox/expected" "$sandbox/expect-error.txt" \
            "$sandbox/task.txt" "$sandbox/produces.txt" \
-           "$sandbox/expect-task-error.txt" "$sandbox/expect-output.txt"
+           "$sandbox/expect-task-error.txt" "$sandbox/expect-output.txt" \
+           "$sandbox/expect-tasks.txt"
     stage_plugin "$sandbox"
 
     # A case whose manifest has to carry a digest of something on disk builds
@@ -85,6 +86,31 @@ run_case() {
       fi
       if ! grep -qF "$clause" "$sandbox/stderr.txt" "$sandbox/stdout.txt"; then
         fail "$name/$manifest_name" "message does not carry: $clause"
+        continue
+      fi
+      passed=$((passed + 1))
+      continue
+    fi
+
+    # What `daukle tasks` NAMES, which needs no CMake and no compiler and so
+    # runs on every host. The tasks a target produces are registered when the
+    # chunk loads, long before anything is provisioned, so gating that assertion
+    # behind a 100 MB download would leave the registration proved only where
+    # the whole toolchain already works.
+    if [ -f "$case_dir/expect-tasks.txt" ]; then
+      if ! (cd "$sandbox" && "$daukle" tasks >tasks.txt 2>tasks-stderr.txt); then
+        cat "$sandbox/tasks-stderr.txt" >&2
+        fail "$name/$manifest_name" "daukle tasks failed"
+        continue
+      fi
+      missing=
+      while IFS= read -r wanted; do
+        [ -n "$wanted" ] || continue
+        grep -qF "$wanted" "$sandbox/tasks.txt" || missing="$missing $wanted"
+      done < "$case_dir/expect-tasks.txt"
+      if [ -n "$missing" ]; then
+        cat "$sandbox/tasks.txt" >&2
+        fail "$name/$manifest_name" "daukle tasks does not name:$missing"
         continue
       fi
       passed=$((passed + 1))

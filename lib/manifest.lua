@@ -442,4 +442,44 @@ local function read(context)
   }
 end
 
-return { read = read, task_name_of = task_name_of }
+--- The task name and kind of every target, read from the manifest as PARSED
+--- rather than from a run-time context, so a chunk can register one task per
+--- target before any command runs.
+---
+--- @implNote it validates NAMES and refuses a collision, and deliberately
+--- validates nothing else. This runs at chunk time, where raising takes every
+--- command in the project down with it, so an empty "sources" or an unknown
+--- link stays the run's business and keeps its own message. The two it does
+--- refuse are fatal at registration anyway: a name a task cannot hold, and two
+--- targets that lowercase to one task.
+local function task_targets(document)
+  local toolchains = document.toolchains
+  local config = toolchains ~= nil and toolchains.cmake or nil
+  if type(config) ~= "table" then return {} end
+
+  if config.targets == nil then
+    if type(document.project) ~= "string" then return {} end
+    local name = target_of(document.project)
+    return { { name = name, task = task_name_of(name), kind = config.kind or "executable" } }
+  end
+  if type(config.targets) ~= "table" then return {} end
+
+  local out = {}
+  local seen = {}
+  for index = 1, #config.targets do
+    local entry = config.targets[index]
+    if type(entry) ~= "table" then return {} end
+    local at = "targets[" .. index .. "]"
+    local task = task_name_of(checked_target_name(entry.name, at))
+    if seen[task] ~= nil then
+      error(string.format('%s is called "%s" and %s is called "%s": they are different CMake'
+                          .. ' targets and the same daukle task "cmake:%s"',
+                          at, entry.name, seen[task].at, seen[task].name, task), 0)
+    end
+    seen[task] = { at = at, name = entry.name }
+    out[#out + 1] = { name = entry.name, task = task, kind = entry.kind or "executable" }
+  end
+  return out
+end
+
+return { read = read, task_name_of = task_name_of, task_targets = task_targets }

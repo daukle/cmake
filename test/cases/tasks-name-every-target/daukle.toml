@@ -1,0 +1,23 @@
+schema = 1
+project = "example/app"
+version = "1.0.0"
+
+[modules]
+
+[plugins]
+cmake = "./plugins/cmake"
+
+# A library and an executable, and a target whose CASE a task name cannot
+# carry: the CMake target stays "Greeter", the task is "cmake:greeter".
+[toolchains.cmake]
+version = "4.4"
+
+  [[toolchains.cmake.targets]]
+  name    = "Greeter"
+  kind    = "library"
+  sources = ["src/lib/*.c"]
+
+  [[toolchains.cmake.targets]]
+  name    = "app"
+  sources = ["src/app/*.c"]
+  links   = ["Greeter"]

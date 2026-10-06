@@ -107,11 +107,25 @@ time with no mention of the manifest, which is a long way from the typo.
 
 **A target name becomes part of a task name**, so it holds only letters, digits, `.`, `_` and `-`,
 may not be `build`, `run` or `configure`, and two targets whose names differ only in case are
-refused by name. The per-target TASKS do not exist yet; see Limits.
+refused by name.
+
+**Every target gets its own tasks**: `cmake:<name>` builds that one, and `cmake:run-<name>` runs it
+when it is an executable. **The task name is lowercased and the CMake target is not**, so a target
+called `Greeter` is built by `cmake:greeter` and is still `Greeter` inside CMake. The mapping is
+lossy in that direction only, which is why two targets differing only in case are refused.
+
+They are registered when the plugin loads, from the manifest daukle was started from, which needs
+a daukle carrying `daukle.manifest`. Against an older core the plugin fails at load with
+`daukle.manifest was not declared in uses`, which is a confusing message for a correct refusal:
+the fix is a newer daukle, not a `uses` entry.
 
 **`cmake:run` needs to know which binary.** With one executable it is that one. With several, set
 `default`, and without it `cmake:run` refuses and names the candidates. `cmake:build` builds
-everything either way.
+everything either way, and `cmake:run-<name>` runs one without choosing a favourite.
+
+**A target declared only in a `daukle.lua` overlay gets no task.** A plugin chunk loads before
+overlays are applied, so it sees the primary manifest alone. The target still builds, under
+`cmake:build`; what it does not get is a name of its own.
 
 ### Two CMake lines, and they are a behaviour boundary rather than old and new
 
@@ -325,13 +339,10 @@ fail on Windows for a reason that has nothing to do with the plugin.
 The compiler a build uses is reported by nothing. That is this plugin's stated narrowing rather
 than a gap: CMake picks it, and nothing here asks which.
 
-**There is no `cmake:<target>` task.** `cmake:build` builds every target and `cmake:run` runs the
-default one; building or running a single target goes through `buildArgs = ["--target", "app"]`,
-and a `run-<name>` target is generated for every executable so that route works. A per-target task
-would have to be registered when the plugin chunk loads, which means reading `daukle.toml`
-unconditionally, which would make that exact filename a requirement for every project using this
-plugin. **That is a coverage loss to buy a convenience**, so it waits on `D-110`. Measured
-2026-10-06.
+**`cmake:<target>` and `cmake:run-<target>` now exist**, and the paragraph here said they could not
+until `D-110` resolved. It has: core publishes `daukle.manifest`, so registration reads the manifest
+daukle was started from and imposes no filename on anyone. The cost this plugin refused to pay is
+gone rather than accepted. See Targets.
 
 **One generated file, so no `add_subdirectory`.** A large CMake project is organised as a
 `CMakeLists.txt` per directory and this generates one. Targets are flat.
