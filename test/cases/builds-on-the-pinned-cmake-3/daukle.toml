@@ -1,0 +1,17 @@
+schema = 1
+project = "example/app"
+version = "1.0.0"
+
+[modules]
+
+[plugins]
+cmake = "./plugins/cmake"
+
+# The other line of the table. CMake 4 refuses a project whose floor is below
+# 3.5, so a plugin pinning only 4.x cannot build one at all.
+[toolchains.cmake]
+version = "3.31"
+configureArgs = [
+  "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=out",
+  "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG=out",
+]

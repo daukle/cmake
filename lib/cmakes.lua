@@ -1,4 +1,12 @@
+--[[ Two lines, and they are on opposite sides of a BEHAVIOUR boundary rather
+     than being old and new. Measured 2026-10-06 against the provisioned
+     binaries: CMake 4.4.3 REFUSES a project whose cmake_minimum_required is
+     below 3.5, exiting 1 with a CMake Error, where 3.31 accepts every floor
+     and only warns below 3.10. A tree of 23 CMakeLists here declares floors
+     from 2.8 to 4.3, so pinning 4.4 alone makes the oldest unbuildable by
+     this plugin at all. D-112. ]]
 local RELEASES = {
+  ["3.31"] = "3.31.12",
   ["4.4"] = "4.4.3",
 }
 
@@ -21,6 +29,16 @@ local EXTENSIONS = { linux = "tar.gz", windows = "zip", macos = "tar.gz" }
 -- Transcribed from cmake-<version>-SHA-256.txt, which Kitware publishes beside
 -- the assets. Never computed from a file on disk.
 local DIGESTS = {
+  ["3.31"] = {
+    ["linux/x86_64"]    = "0dc2e9a6860f06bf10bd8fadc03e35d9eeb4df46e33763a7e480e987758f385c",
+    ["linux/aarch64"]   = "83f8fd91d2038a56556e1400390fcfe42f79602940c494f6c6f1cdae7f9e7f40",
+    -- One universal archive serves both Mac architectures, which is why these
+    -- two digests are equal on purpose rather than by a copy-paste slip.
+    ["macos/x86_64"]    = "799af7fd545db9bf1b9cfe72f8095880e727a2d4e0df0e3dffc3bc7b95c2d3b0",
+    ["macos/aarch64"]   = "799af7fd545db9bf1b9cfe72f8095880e727a2d4e0df0e3dffc3bc7b95c2d3b0",
+    ["windows/x86_64"]  = "0c4baa40f28b3f8225eb3fdf6946c987b4fe901403b4eaf2fbbd9378100aaa0c",
+    ["windows/aarch64"] = "e4160c1842dea858ad376ff2ec17587104515b51714eca5963b8bdd798105553",
+  },
   ["4.4"] = {
     ["linux/x86_64"]    = "d6c83076c575bc00b823522ac974bda66d0af05d6ddc30e739c12385cf32c6cc",
     ["linux/aarch64"]   = "2efc974dbd63b4444c0e8494b92f2e80c2d7e635b4b80eac2916985ddd8f72a6",
