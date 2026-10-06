@@ -73,6 +73,45 @@ version = "4.4"
 | `generator` | none | passed to `-G`; see the generator note below |
 | `compiler` | none | a `daukle/c` clang version, e.g. `"21"`. Provisions that compiler AND Ninja and drives the build with both; see below |
 | `configureArgs`, `buildArgs`, `runArgs` | none | passed through verbatim |
+| `targets` | none | a list of targets; see below. Declaring it moves `kind`, `sources`, `includes`, `defines` and `standard` onto each target |
+| `default` | the only executable | which executable `cmake:run` means, when there is more than one |
+
+### More than one target
+
+A CMake project's job is to build several things that link to each other, so this plugin models N
+of them rather than one. With no `targets` key, the project is one target named after the project
+id, which is what it has always been.
+
+```toml
+[toolchains.cmake]
+version = "4.4"
+
+  [[toolchains.cmake.targets]]
+  name    = "greet"
+  kind    = "library"
+  sources = ["src/lib/*.c"]
+
+  [[toolchains.cmake.targets]]
+  name    = "app"
+  sources = ["src/app/*.c"]
+  links   = ["greet"]
+```
+
+A target owns `name`, `kind`, `sources`, `includes`, `defines`, `standard` and `links`; everything
+else stays project wide. **A project-wide `sources` beside `targets` is refused** rather than
+silently applying to none of them.
+
+**`links` names another declared target or a package the resolver fetches, and anything else is
+refused where the manifest is read.** CMake reports an unknown link as a missing library at LINK
+time with no mention of the manifest, which is a long way from the typo.
+
+**A target name becomes part of a task name**, so it holds only letters, digits, `.`, `_` and `-`,
+may not be `build`, `run` or `configure`, and two targets whose names differ only in case are
+refused by name. The per-target TASKS do not exist yet; see Limits.
+
+**`cmake:run` needs to know which binary.** With one executable it is that one. With several, set
+`default`, and without it `cmake:run` refuses and names the candidates. `cmake:build` builds
+everything either way.
 
 `version` is a pinned `major.minor`, and **a range is refused**. `">=4.0"` and `"^4.4"` are both
 errors: this plugin ships a table of exact releases with their published digests, and matching a
@@ -262,3 +301,20 @@ fail on Windows for a reason that has nothing to do with the plugin.
 
 The compiler a build uses is reported by nothing. That is this plugin's stated narrowing rather
 than a gap: CMake picks it, and nothing here asks which.
+
+**There is no `cmake:<target>` task.** `cmake:build` builds every target and `cmake:run` runs the
+default one; building or running a single target goes through `buildArgs = ["--target", "app"]`,
+and a `run-<name>` target is generated for every executable so that route works. A per-target task
+would have to be registered when the plugin chunk loads, which means reading `daukle.toml`
+unconditionally, which would make that exact filename a requirement for every project using this
+plugin. **That is a coverage loss to buy a convenience**, so it waits on `D-110`. Measured
+2026-10-06.
+
+**One generated file, so no `add_subdirectory`.** A large CMake project is organised as a
+`CMakeLists.txt` per directory and this generates one. Targets are flat.
+
+**No loop.** daukle core's own build adds one test executable per source file with a CMake
+`foreach`; expressing that here is one declared target per binary. Buildable in shape, verbose in
+practice.
+
+**No install, export or package.** Unmodelled and unmeasured.

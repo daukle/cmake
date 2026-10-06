@@ -1,0 +1,2 @@
+build/daukle/cmake/_b/out/app*
+build/daukle/cmake/_b/out/*greet*
