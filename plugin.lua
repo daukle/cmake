@@ -1,6 +1,6 @@
 daukle.plugin{
   api = 1,
-  uses = { "provision", "exec" },
+  uses = { "provision", "exec", "read", "parse" },
   requires = {
     lifecycle = {
       url = "https://github.com/daukle/lifecycle/releases/download/1.0.0/plugin.lua",
@@ -171,3 +171,39 @@ daukle.task(names.assert_contract(names.RUN, {
                                 "--config", spec.buildType }, spec.runArgs))
   end,
 }))
+
+--[[ One task per target, which is what makes N targets REACHABLE rather than
+     merely buildable: cmake:build builds them all and cmake:run needs a
+     favourite, so without these a project's second executable has no name.
+     The spec's 2.4 specified them, dropped them because a chunk had to spell
+     "daukle.toml", and said the registration would be a pure addition once
+     that was fixed. daukle.manifest fixed it, and this is that addition. ]]
+local function build_target(target_name)
+  return function(context)
+    local spec = manifest.read(context)
+    local cmake = provision_cmake(context, spec)
+    daukle.exec(cmake, append({ "--build", "_b", "--target", target_name,
+                                "--config", spec.buildType }, spec.buildArgs))
+  end
+end
+
+for _, target in ipairs(manifest.task_targets(
+    daukle.parse(daukle.read(daukle.manifest), daukle.manifest))) do
+  -- The CMake target keeps the user's case; only the task name is lowercased,
+  -- so "--target" takes the original and the two are not interchangeable.
+  daukle.task{
+    name = "cmake:" .. target.task,
+    dependsOn = { "cmake:configure" },
+    run = build_target(target.name),
+  }
+  --[[ The generator emits run-<name> for every executable and for no library,
+       so asking for one here on a library would build a target CMake does not
+       have. ]]
+  if target.kind == "executable" then
+    daukle.task{
+      name = "cmake:run-" .. target.task,
+      dependsOn = { "cmake:" .. target.task },
+      run = build_target("run-" .. target.task),
+    }
+  end
+end

@@ -1,0 +1,3 @@
+cmake:greeter
+cmake:app
+cmake:run-app
