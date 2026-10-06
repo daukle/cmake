@@ -9,9 +9,12 @@ cmake = "./plugins/cmake"
 
 # The other line of the table. CMake 4 refuses a project whose floor is below
 # 3.5, so a plugin pinning only 4.x cannot build one at all.
+#
+# It provisions its own compiler rather than using the host's, and that is the
+# POINT rather than convenience: CMake 3.31 predates Visual Studio 18 2026 and
+# has no generator for it, so on a host with only that it finds no compiler at
+# all. Driving a provisioned clang through Ninja is the mode in which the old
+# line works everywhere, and AUTHORING.md says so where a user will read it.
 [toolchains.cmake]
-version = "3.31"
-configureArgs = [
-  "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=out",
-  "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG=out",
-]
+version  = "3.31"
+compiler = "21"

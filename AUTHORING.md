@@ -128,6 +128,14 @@ The 23 `CMakeLists.txt` files under `F:/Documents/GitHub` declare floors from **
 plugin pinning 4.4 alone cannot build the oldest **at all**. `3.31` is the last 3.x line and is
 there for exactly those. **Declare `4.4` unless your floor is below 3.5.**
 
+**An old CMake cannot drive a new compiler, and that cuts the other way.** CMake 3.31 predates
+**Visual Studio 18 2026** and carries no generator for it, so on a host whose only toolchain is that
+one it configures nothing: `CMAKE_C_COMPILER not set, after EnableLanguage`. Found on the
+`windows-latest` runner, where 4.4 succeeds against the same installation. **On such a host, pair
+`version = "3.31"` with `compiler`**, which provisions a clang and drives it with Ninja and so
+needs no Visual Studio at all. That is what this repository's own `builds-on-the-pinned-cmake-3`
+case does, for that reason rather than for convenience.
+
 `version` is a pinned `major.minor`, and **a range is refused**. `">=4.0"` and `"^4.4"` are both
 errors: this plugin ships a table of exact releases with their published digests, and matching a
 range would mean resolving a version it has no digest for.
