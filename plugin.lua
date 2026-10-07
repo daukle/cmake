@@ -115,11 +115,10 @@ end
 --[[ The ambiguity lives here rather than in generation, because a project with
      two executables and no favourite is a buildable project: refusing it when
      the file is written would take cmake:build down with cmake:run.
-     @implNote the remedy named is "default" and not a per-target task,
-     because there is no per-target task yet and an error message that names
-     one would be a lie. D-110 carries why: registering one costs every
-     project using this plugin the requirement that its manifest be called
-     daukle.toml, which is a coverage loss to buy a convenience. ]]
+     @implNote both remedies are named because both exist: "default" picks
+     which executable cmake:run means, and cmake:run-<name> reaches any of
+     them without choosing. The second arrived with the per-target tasks in
+     1.4.0, and until then this message named only the first. ]]
 local function refuse_an_unrunnable_project(spec)
   if spec.default ~= nil then return end
 
@@ -132,9 +131,14 @@ local function refuse_an_unrunnable_project(spec)
     error("this project declares no executable target, so there is nothing for cmake:run to run",
           0)
   end
+  local tasks = {}
+  for index = 1, #runnable do
+    tasks[index] = "cmake:run-" .. manifest.task_name_of(runnable[index])
+  end
   error('this project declares ' .. #runnable .. ' executable targets, so "cmake:run" does not'
         .. ' name one: set "default" to the one it should mean, out of '
-        .. table.concat(runnable, ", "), 0)
+        .. table.concat(runnable, ", ") .. ', or run one directly with '
+        .. table.concat(tasks, ", "), 0)
 end
 
 daukle.task{
@@ -187,8 +191,19 @@ local function build_target(target_name)
   end
 end
 
-for _, target in ipairs(manifest.task_targets(
-    daukle.parse(daukle.read(daukle.manifest), daukle.manifest))) do
+--[[ @implNote daukle.parse refuses an executable format and the sandbox has no
+     pcall, so parsing daukle.manifest unguarded is FATAL on a project whose
+     only manifest is daukle.lua: core accepts one by falling back to the
+     overlay when no primary exists. Such a project keeps every lifecycle verb
+     and gets no per-target task, because nothing a chunk can reach sees a
+     Lua-declared config. ]]
+local function declarative_manifest()
+  if string.match(daukle.manifest, "%.toml$") == nil then return nil end
+  return daukle.parse(daukle.read(daukle.manifest), daukle.manifest)
+end
+
+local document = declarative_manifest()
+for _, target in ipairs(document ~= nil and manifest.task_targets(document) or {}) do
   -- The CMake target keeps the user's case; only the task name is lowercased,
   -- so "--target" takes the original and the two are not interchangeable.
   daukle.task{

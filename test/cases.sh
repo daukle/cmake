@@ -50,7 +50,11 @@ run_case() {
   case_dir=$1
   name=$(basename "$case_dir")
 
-  for manifest in "$case_dir"/daukle*.toml; do
+  # daukle.lua is included because core accepts one as the PRIMARY manifest
+  # when no daukle.toml sits beside it, and a chunk that parses the manifest
+  # has to survive a format daukle.parse refuses to run.
+  for manifest in "$case_dir"/daukle*.toml "$case_dir"/daukle.lua; do
+    [ -f "$manifest" ] || continue
     manifest_name=$(basename "$manifest")
     sandbox="$work/$name-$manifest_name"
     rm -rf "$sandbox"
@@ -59,7 +63,7 @@ run_case() {
     rm -rf "$sandbox/expected" "$sandbox/expect-error.txt" \
            "$sandbox/task.txt" "$sandbox/produces.txt" \
            "$sandbox/expect-task-error.txt" "$sandbox/expect-output.txt" \
-           "$sandbox/expect-tasks.txt"
+           "$sandbox/expect-tasks.txt" "$sandbox/expect-no-tasks.txt"
     stage_plugin "$sandbox"
 
     # A case whose manifest has to carry a digest of something on disk builds
@@ -112,6 +116,20 @@ run_case() {
         cat "$sandbox/tasks.txt" >&2
         fail "$name/$manifest_name" "daukle tasks does not name:$missing"
         continue
+      fi
+      # A presence-only assertion cannot catch a task that should not be there,
+      # which is how "and no run-greeter" stayed a sentence rather than a check.
+      if [ -f "$case_dir/expect-no-tasks.txt" ]; then
+        present=
+        while IFS= read -r unwanted; do
+          [ -n "$unwanted" ] || continue
+          grep -qF "$unwanted" "$sandbox/tasks.txt" && present="$present $unwanted"
+        done < "$case_dir/expect-no-tasks.txt"
+        if [ -n "$present" ]; then
+          cat "$sandbox/tasks.txt" >&2
+          fail "$name/$manifest_name" "daukle tasks names what it must not:$present"
+          continue
+        fi
       fi
       passed=$((passed + 1))
       continue
