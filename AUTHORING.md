@@ -127,6 +127,13 @@ everything either way, and `cmake:run-<name>` runs one without choosing a favour
 overlays are applied, so it sees the primary manifest alone. The target still builds, under
 `cmake:build`; what it does not get is a name of its own.
 
+**And a project whose ONLY manifest is `daukle.lua` gets no per-target task at all**, keeping
+`cmake:configure`, `cmake:build` and `cmake:run`. Core accepts such a project by falling back to
+the overlay when no primary exists, so `daukle.manifest` names a Lua file, and `daukle.parse`
+refuses to run an executable format. Nothing a chunk can reach sees a Lua-declared config, so the
+alternative to this boundary is not more tasks but a crash: **parsing it unguarded was fatal on
+every command**, which is how `1.4.0` shipped and what `1.4.1` fixes.
+
 ### Two CMake lines, and they are a behaviour boundary rather than old and new
 
 **CMake 4 refuses a project whose `cmake_minimum_required` is below 3.5.** Measured 2026-10-06
