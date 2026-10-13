@@ -1,3 +1,5 @@
+local values = daukle.require("lib/values")
+
 local LANGUAGES = { c = "C", ["c++"] = "CXX" }
 local STANDARD_PROPERTY = { c = "C_STANDARD", ["c++"] = "CXX_STANDARD" }
 local KINDS = { executable = true, library = true }
@@ -56,98 +58,6 @@ local function version_of(context)
           .. ' not a range: this plugin pins its releases and does not match ranges', 0)
   end
   return version
-end
-
-local function climbs_out(path)
-  if string.match(path, "^/") ~= nil or string.match(path, "^%a:") ~= nil then return true end
-  if string.find(path, "\\", 1, true) ~= nil then return true end
-  if path == ".." or string.match(path, "^%.%./") ~= nil then return true end
-  return string.find(path, "/../", 1, true) ~= nil or string.match(path, "/%.%.$") ~= nil
-end
-
--- Everything here is interpolated into a file the user is told not to read, so
--- a character that ends a CMake argument or starts a variable expansion cannot
--- be allowed through. configureArgs is the escape hatch for anything this
--- refuses.
-local function escapes_cmake(value)
-  return string.find(value, '"', 1, true) ~= nil
-      or string.find(value, "\\", 1, true) ~= nil
-      or string.find(value, "$", 1, true) ~= nil
-      or string.find(value, ")", 1, true) ~= nil
-      or string.find(value, ";", 1, true) ~= nil
-      or string.find(value, "\n", 1, true) ~= nil
-      or string.find(value, "\r", 1, true) ~= nil
-end
-
-local function reject_escapes(value, key)
-  if escapes_cmake(value) then
-    error(string.format('"%s" may not carry a CMake metacharacter, and "%s" does:'
-                        .. ' a generated file is one nobody reads, so use "configureArgs"'
-                        .. ' for anything this refuses', key, value), 0)
-  end
-end
-
-local function string_list(value, key, plural, singular)
-  if value == nil then return nil end
-  if type(value) ~= "table" then
-    error('"' .. key .. '" must be a list of ' .. plural .. ', not a ' .. type(value), 0)
-  end
-  local count = 0
-  for _ in pairs(value) do count = count + 1 end
-  if count ~= #value then
-    error('"' .. key .. '" must be a list of ' .. plural .. ', not a table of named keys', 0)
-  end
-  for index = 1, #value do
-    if type(value[index]) ~= "string" then
-      error(string.format('"%s" must name a %s as a string, not a %s',
-                          key, singular, type(value[index])), 0)
-    end
-  end
-  return value
-end
-
--- Only for a list whose entries are interpolated into the generated file. The
--- three *Args lists are the documented escape hatch and reach daukle.exec as
--- argv, so they must NOT be narrowed this way.
-local function cmake_text_list(value, key, plural, singular)
-  local list = string_list(value, key, plural, singular)
-  if list == nil then return nil end
-  for index = 1, #list do
-    reject_escapes(list[index], key)
-  end
-  return list
-end
-
-local function path_list(value, key, plural, singular)
-  local list = cmake_text_list(value, key, plural, singular)
-  if list == nil then return nil end
-  for index = 1, #list do
-    if climbs_out(list[index]) then
-      error(string.format('"%s" may not climb out of the project, and "%s" does',
-                          key, list[index]), 0)
-    end
-  end
-  return list
-end
-
-local function scalar_version(value, key)
-  if value == nil then return nil end
-  local kind = type(value)
-  if kind == "number" then
-    -- A TOML integer reaches Lua as a float, and tostring would append ".0",
-    -- which is how "release = 17" became "--release 17.0" on the java branch.
-    if value ~= math.floor(value) then
-      error('"' .. key .. '" must be a whole version such as 17, not ' .. tostring(value), 0)
-    end
-    return string.format("%d", value)
-  end
-  if kind ~= "string" then
-    error('"' .. key .. '" must be a version such as "17", not a ' .. kind, 0)
-  end
-  if string.match(value, "^[%w%.%+%-]+$") == nil then
-    error(string.format('"%s" must be a version such as "17", and "%s" is not', key, value), 0)
-  end
-  return value
 end
 
 local function target_of(project)
@@ -209,7 +119,7 @@ local function targets_of(config, language, project_target, package_names)
     if KINDS[kind] == nil then
       error('"kind" must be "executable" or "library", not "' .. tostring(kind) .. '"', 0)
     end
-    local sources = path_list(config.sources, "sources", "globs", "glob")
+    local sources = values.path_list(config.sources, "sources", "globs", "glob")
                     or default_sources(language)
     if #sources == 0 then
       error('"sources" is empty, so there is nothing to compile', 0)
@@ -219,9 +129,9 @@ local function targets_of(config, language, project_target, package_names)
       task = task_name_of(project_target),
       kind = kind,
       sources = sources,
-      includes = path_list(config.includes, "includes", "directories", "directory"),
-      defines = cmake_text_list(config.defines, "defines", "definitions", "definition"),
-      standard = scalar_version(config.standard, "standard"),
+      includes = values.path_list(config.includes, "includes", "directories", "directory"),
+      defines = values.cmake_text_list(config.defines, "defines", "definitions", "definition"),
+      standard = values.scalar_version(config.standard, "standard"),
       links = package_names,
     } }
   end
@@ -263,7 +173,7 @@ local function targets_of(config, language, project_target, package_names)
       error(string.format('%s has a "kind" that must be "executable" or "library", not "%s"',
                           at, tostring(kind)), 0)
     end
-    local sources = path_list(entry.sources, at .. ".sources", "globs", "glob")
+    local sources = values.path_list(entry.sources, at .. ".sources", "globs", "glob")
                     or default_sources(language)
     if #sources == 0 then
       error(string.format('%s has an empty "sources", so there is nothing to compile', at), 0)
@@ -273,10 +183,12 @@ local function targets_of(config, language, project_target, package_names)
       task = task,
       kind = kind,
       sources = sources,
-      includes = path_list(entry.includes, at .. ".includes", "directories", "directory"),
-      defines = cmake_text_list(entry.defines, at .. ".defines", "definitions", "definition"),
-      standard = scalar_version(entry.standard, at .. ".standard"),
-      links = cmake_text_list(entry.links, at .. ".links", "target names", "target name") or {},
+      includes = values.path_list(entry.includes, at .. ".includes", "directories", "directory"),
+      defines = values.cmake_text_list(entry.defines, at .. ".defines", "definitions",
+                                       "definition"),
+      standard = values.scalar_version(entry.standard, at .. ".standard"),
+      links = values.cmake_text_list(entry.links, at .. ".links", "target names",
+                                     "target name") or {},
     }
   end
 
@@ -354,7 +266,7 @@ local function dependencies_of(context)
       error(string.format('modules.%s.cmake has a "sha256" that is not 64 hex digits: "%s"',
                           entry.module, block.sha256), 0)
     end
-    if escapes_cmake(block.url) then
+    if values.escapes_cmake(block.url) then
       error(string.format('modules.%s.cmake has a "url" carrying a CMake metacharacter: "%s"',
                           entry.module, block.url), 0)
     end
@@ -400,7 +312,7 @@ local function read(context)
     error('"generator" must be a string, not a ' .. type(generator), 0)
   end
 
-  local compiler = scalar_version(config.compiler, "compiler")
+  local compiler = values.scalar_version(config.compiler, "compiler")
   -- Refused rather than resolved in the plugin's favour: Ninja is the only
   -- generator that both honours CMAKE_C_COMPILER and needs no build program
   -- the host must supply, so there is no generator left to honour. Visual
@@ -434,9 +346,10 @@ local function read(context)
     buildType = build_type or "Debug",
     generator = generator,
     compiler = compiler,
-    configureArgs = string_list(config.configureArgs, "configureArgs", "arguments", "argument"),
-    buildArgs = string_list(config.buildArgs, "buildArgs", "arguments", "argument"),
-    runArgs = string_list(config.runArgs, "runArgs", "arguments", "argument"),
+    configureArgs = values.string_list(config.configureArgs, "configureArgs", "arguments",
+                                       "argument"),
+    buildArgs = values.string_list(config.buildArgs, "buildArgs", "arguments", "argument"),
+    runArgs = values.string_list(config.runArgs, "runArgs", "arguments", "argument"),
     dependencies = dependencies,
     root = context.root,
   }
