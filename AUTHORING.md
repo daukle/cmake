@@ -1,7 +1,8 @@
 # Authoring notes
 
 This plugin is multi-file. `plugin.lua` declares the toolchain and the three tasks; `lib/manifest`
-validates the `[toolchains.cmake]` block into a spec; `lib/generate` renders that spec into
+validates the `[toolchains.cmake]` block into a spec, with `lib/targets` reading the target list
+and `lib/values` checking each value; `lib/generate` renders that spec into
 `CMakeLists.txt`; `lib/cmakes` holds the pinned archive table. Only `lib/manifest` reads
 `context.config` or `context.toolchain`.
 
