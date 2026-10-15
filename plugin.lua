@@ -96,7 +96,10 @@ end
 -- The whole of what "compiler" does, kept in one place because the three
 -- settings are one decision: a provisioned compiler is unreachable without a
 -- generator that honours it, and that generator is unusable without a build
--- program the host does not have.
+-- program the host does not have. On macOS the SDK is part of the same
+-- decision: CMake 4 no longer picks one, and xpack's clang defaults to the
+-- Command Line Tools SDK, which need not be the one the host's ld can read
+-- (D-138). "macosx" makes CMake ask xcrun, as Apple's own clang shim does.
 local function append_toolchain(argv, context, spec)
   if spec.compiler == nil then
     if spec.generator ~= nil then
@@ -109,6 +112,9 @@ local function append_toolchain(argv, context, spec)
   argv[#argv + 1] = "Ninja"
   argv[#argv + 1] = "-DCMAKE_MAKE_PROGRAM=" .. provision_ninja(context)
   argv[#argv + 1] = "-DCMAKE_C_COMPILER=" .. provision_compiler(context, spec)
+  if context.host.os == "macos" then
+    argv[#argv + 1] = "-DCMAKE_OSX_SYSROOT=macosx"
+  end
   return argv
 end
 
