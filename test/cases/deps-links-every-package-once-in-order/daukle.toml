@@ -10,7 +10,7 @@ path = "./producer"
 
 [plugins]
 fixture = "./plugins/fixture.lua"
-deps = "./plugins/cmake-deps.lua"
+deps = { path = "./plugins/cmake", modules = ["deps"] }
 
 [[consumers]]
 id = "native"

@@ -14,9 +14,9 @@ That layering is the point of having a C **base** separate from a C **build syst
 repositories are not two attempts at CMake, they are a base and the build tool above it. The
 duplication only ever read as a collision while the layer between them was unbuilt.
 
-`deps.lua` ships beside the plugin as a second asset and writes the `FetchContent` blocks. It lives
-here rather than in `daukle/c` because core refuses one chunk holding `exec` or `provision` to
-declare a language at all.
+`modules/deps.lua` writes the `FetchContent` blocks. It is a module of this plugin: name it with
+`modules = ["deps"]` on the `[plugins]` line and it loads with its own narrow grant, without the
+toolchain.
 
 ## One target, and the narrowing has already cost something
 
