@@ -38,9 +38,13 @@ on Linux with no `make`.
 
 ## Dependencies
 
-`deps.lua` ships beside the plugin as a second asset and writes `FetchContent` blocks. It moved
-here from `daukle/c`, because core refuses one chunk that holds `exec` or `provision` to declare a
-language at all.
+The dependency writer is a MODULE of this plugin and writes `FetchContent` blocks. Name it on the
+same line, with its own grant and without the toolchain, from `daukle 0.9.0`:
+
+```toml
+[plugins]
+cmake = { resolver = "github", coordinate = "daukle/cmake@^1.5.0", modules = ["deps"] }
+```
 
 ## What it does not do
 

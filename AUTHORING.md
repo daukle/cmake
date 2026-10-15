@@ -13,37 +13,22 @@ A release carries two assets, and they are different plugins with different jobs
 `plugin.lua` is the **managed toolchain** this document is about: daukle owns the generated
 build file, provisions CMake and runs it.
 
-`deps.lua` is a **dependency writer**: it edits a `CMakeLists.txt` that YOU own and maintain,
-writing a `FetchContent` block into a `# daukle:begin` region, and it needs CMake already
-installed. Reach it with a SECOND resolver, because **`asset` is a key of the resolver, not of
-the plugin entry**:
+`modules/deps.lua` is a **dependency writer**: it edits a `CMakeLists.txt` that YOU own and
+maintain, writing a `FetchContent` block into a `# daukle:begin` region, and it needs CMake already
+installed. **It is a MODULE of this plugin** (`daukle 0.9.0`, `D-134`), so a project names it on the
+same `[plugins]` line and gets ITS grant, `region`, and not the toolchain's `exec`:
 
 ```toml
-[resolvers.github]
-url = "https://raw.githubusercontent.com/daukle/daukle/<rev>/plugins/github-releases.lua"
-sha256 = "..."
-
-[resolvers.github-deps]
-url = "https://raw.githubusercontent.com/daukle/daukle/<rev>/plugins/github-releases.lua"
-sha256 = "..."
-asset = "deps.lua"
-
 [plugins]
-cmake      = { resolver = "github",      coordinate = "daukle/cmake@^1.0.0" }
-cmake-deps = { resolver = "github-deps", coordinate = "daukle/cmake@^1.0.0" }
+cmake = { resolver = "github", coordinate = "daukle/cmake@^1.5.0", modules = ["deps"] }
+# or both: modules = ["main", "deps"]
 ```
 
-Two things here were measured on 2026-10-02 rather than assumed, and both bite silently.
-**An `asset` written on a `[plugins]` entry is accepted and ignored**: daukle hands the resolver
-the RESOLVER's block, so the key never arrives, the default `plugin.lua` is fetched, and you get
-the toolchain where you asked for the writer with no error at all. **And the range needs a full
-version**: `@^1` is refused, `@^1.0.0` is not.
-
-They are two artifacts rather than two declarations in one chunk because **core refuses it**:
-a chunk holding `exec` or `provision` may not declare `daukle.language` at all. A plugin is a
-managed toolchain or a dependency writer, never both. `deps.lua` lived in `daukle/c` until
-1.0.1, where it was misfiled: it is about CMake's syntax and CMake's dependency mechanism,
-and about C only in the sense that CMake is mostly used for C.
+**The raw `deps.lua` asset is still published beside the tar for one release**, so a manifest
+using the old two-resolver form (`[resolvers.github-deps]` with `asset = "deps.lua"`) keeps working
+until it moves to the line above. `deps.lua` lived in `daukle/c` until 1.0.1, where it was
+misfiled: it is about CMake's syntax and CMake's dependency mechanism, and about C only in the
+sense that CMake is mostly used for C.
 
 ## What this plugin owns
 
