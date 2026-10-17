@@ -44,9 +44,14 @@ local function render(spec)
       put(string.format("add_executable(%s ${%s})", target.name, variable))
     end
 
-    if #target.links > 0 then
+    local linked = {}
+    for index_of_link = 1, #target.links do linked[#linked + 1] = target.links[index_of_link] end
+    for index_of_library = 1, #target.systemLinks do
+      linked[#linked + 1] = target.systemLinks[index_of_library]
+    end
+    if #linked > 0 then
       put(string.format("target_link_libraries(%s PRIVATE %s)",
-                        target.name, table.concat(target.links, " ")))
+                        target.name, table.concat(linked, " ")))
     end
 
     if target.includes ~= nil and #target.includes > 0 then
