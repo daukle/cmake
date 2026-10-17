@@ -1,6 +1,6 @@
 daukle.plugin{
   api = 1,
-  uses = { "provision", "exec", "read", "parse" },
+  uses = { "provision", "exec", "built", "read", "parse" },
   requires = {
     lifecycle = {
       url = "https://github.com/daukle/lifecycle/releases/download/1.0.0/plugin.lua",
@@ -170,15 +170,31 @@ daukle.task(names.assert_contract(names.BUILD, {
   end,
 }))
 
+--[[ Runs an executable the build already produced, with runArgs as its argv
+     and nothing between them and the program, so no argument is ever written
+     into a generated file or reparsed by a shell or by CMake.
+     @implNote the working directory is CMake's binary directory, as AUTHORING
+     documents: moving it would relocate every file a program writes by
+     relative path. ]]
+local PROGRAM_CWD = "build/daukle/cmake/_b"
+
+local function run_program(context, spec, target_name)
+  local program = "_b/" .. generate.RUNTIME_DIRECTORY .. "/" .. target_name
+                  .. executable_suffix(context)
+  local result = daukle.exec(daukle.built(program), spec.runArgs or {},
+                             { cwd = PROGRAM_CWD, check = false })
+  if result.code ~= 0 then
+    error(string.format('the program "%s" exited with code %d', target_name, result.code), 0)
+  end
+end
+
 daukle.task(names.assert_contract(names.RUN, {
   name = names.qualify("cmake", names.RUN),
   dependsOn = { names.qualify("cmake", names.BUILD) },
   run = function(context)
     local spec = manifest.read(context)
     refuse_an_unrunnable_project(spec)
-    local cmake = provision_cmake(context, spec)
-    daukle.exec(cmake, append({ "--build", "_b", "--target", "run",
-                                "--config", spec.buildType }, spec.runArgs))
+    run_program(context, spec, spec.default.name)
   end,
 }))
 
@@ -217,14 +233,13 @@ for _, target in ipairs(document ~= nil and manifest.task_targets(document) or {
     dependsOn = { "cmake:configure" },
     run = build_target(target.name),
   }
-  --[[ The generator emits run-<name> for every executable and for no library,
-       so asking for one here on a library would build a target CMake does not
-       have. ]]
   if target.kind == "executable" then
     daukle.task{
       name = "cmake:run-" .. target.task,
       dependsOn = { "cmake:" .. target.task },
-      run = build_target("run-" .. target.task),
+      run = function(context)
+        run_program(context, manifest.read(context), target.name)
+      end,
     }
   end
 end
