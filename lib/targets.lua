@@ -10,7 +10,7 @@ local KNOWN_KEYS = {
   version = true, language = true, kind = true, sources = true, includes = true,
   defines = true, standard = true, buildType = true, generator = true,
   configureArgs = true, buildArgs = true, runArgs = true, dependencies = true,
-  compiler = true, targets = true, default = true,
+  compiler = true, targets = true, default = true, systemLinks = true,
 }
 
 --[[ The five keys a TARGET owns. A project-wide key is not one of these: a
@@ -19,7 +19,7 @@ local KNOWN_KEYS = {
      could ask for different generators. ]]
 local TARGET_KEYS = {
   name = true, kind = true, sources = true, includes = true, defines = true,
-  standard = true, links = true,
+  standard = true, links = true, systemLinks = true,
 }
 
 -- A target becomes a task, and core refuses a task name that is not lowercase
@@ -84,6 +84,36 @@ local function reject_unknown_target_keys(target, at)
   end
 end
 
+--- @implNote checked here rather than left to CMake, which reports an unknown
+--- link as a missing library at LINK time with no mention of the manifest. A
+--- library the HOST provides is the one other kind, and it has its own key,
+--- "systemLinks", precisely so that anything else in "links" stays a typo.
+local function refuse_an_unknown_link(target, index, declared, package_names)
+  for link_index = 1, #target.links do
+    local link = target.links[link_index]
+    if not declared[link] and not package_names_hold(package_names, link) then
+      error(string.format('targets[%d] links "%s", which is neither another target this'
+                          .. ' manifest declares nor a package it fetches. A library the host'
+                          .. ' provides, such as "m" or "pthread", goes in "systemLinks"',
+                          index, link), 0)
+    end
+  end
+end
+
+--- @implNote the converse of refuse_an_unknown_link: a target or a package
+--- named in "systemLinks" would link, but it would skip the one check that
+--- makes "links" worth having.
+local function refuse_a_known_name_as_a_system_library(target, key, declared, package_names)
+  for link_index = 1, #target.systemLinks do
+    local library = target.systemLinks[link_index]
+    if declared[library] or package_names_hold(package_names, library) then
+      error(string.format('"%s" names "%s", which this manifest declares or fetches: it'
+                          .. ' belongs in "links", where a misspelling is caught',
+                          key, library), 0)
+    end
+  end
+end
+
 --- Every target, as a LIST, whether the manifest declared one implicitly
 --- through the project-wide keys or several through "targets". The caller
 --- never branches on which, which is the whole point: a generator that loops
@@ -104,7 +134,7 @@ local function targets_of(config, language, project_target, package_names)
     if #sources == 0 then
       error('"sources" is empty, so there is nothing to compile', 0)
     end
-    return { {
+    local only = {
       name = project_target,
       task = task_name_of(project_target),
       kind = kind,
@@ -113,7 +143,11 @@ local function targets_of(config, language, project_target, package_names)
       defines = values.cmake_text_list(config.defines, "defines", "definitions", "definition"),
       standard = values.scalar_version(config.standard, "standard"),
       links = package_names,
-    } }
+      systemLinks = values.system_library_list(config.systemLinks, "systemLinks") or {},
+    }
+    refuse_a_known_name_as_a_system_library(only, "systemLinks", { [project_target] = true },
+                                            package_names)
+    return { only }
   end
 
   if type(config.targets) ~= "table" or #config.targets == 0 then
@@ -169,22 +203,14 @@ local function targets_of(config, language, project_target, package_names)
       standard = values.scalar_version(entry.standard, at .. ".standard"),
       links = values.cmake_text_list(entry.links, at .. ".links", "target names",
                                      "target name") or {},
+      systemLinks = values.system_library_list(entry.systemLinks, at .. ".systemLinks") or {},
     }
   end
 
-  --[[ Checked here rather than left to CMake, which reports an unknown link as
-       a missing library at LINK time with no mention of the manifest. A link
-       names a sibling target or a package the resolver fetched; there is no
-       third kind, so anything else is a typo. ]]
   for index = 1, #out do
-    local links = out[index].links
-    for link_index = 1, #links do
-      local link = links[link_index]
-      if not declared[link] and not package_names_hold(package_names, link) then
-        error(string.format('targets[%d] links "%s", which is neither another target this'
-                            .. ' manifest declares nor a package it fetches', index, link), 0)
-      end
-    end
+    refuse_an_unknown_link(out[index], index, declared, package_names)
+    refuse_a_known_name_as_a_system_library(out[index], 'targets[' .. index .. '].systemLinks',
+                                            declared, package_names)
   end
   return out
 end
