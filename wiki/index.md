@@ -48,6 +48,6 @@ cmake = { resolver = "github", coordinate = "daukle/cmake@^1.5.0", modules = ["d
 
 ## What it does not do
 
-**One target.** A project with two is not modellable, which is why the one real CMake application
-in this organization could not migrate. The compiler a build actually used is reported by nothing,
-which is this plugin's stated narrowing rather than a defect.
+The compiler a build actually used is reported by nothing, which is this plugin's stated narrowing
+rather than a defect. Several executables and libraries in one project are modelled through
+`targets`; see `AUTHORING.md`.

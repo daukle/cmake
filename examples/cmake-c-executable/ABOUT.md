@@ -71,8 +71,9 @@ near the root of a drive, or use another generator.
 
 ## What this example cannot show
 
-**More than one target.** The modelled surface is one executable or one library. A project with an
-application and a CLI beside it does not fit yet.
+**More than one target.** This example builds one executable. Several targets in one project, an
+application and a CLI beside it for instance, are declared through `targets` (see `AUTHORING.md`),
+and the plugin's own test cases exercise that shape rather than this example.
 
 ## The one file that is a harness input rather than part of the example
 
