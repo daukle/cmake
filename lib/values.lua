@@ -70,6 +70,39 @@ local function path_list(value, key, plural, singular)
   return list
 end
 
+--- @implNote an allowlist rather than escapes_cmake, because an entry lands
+--- UNQUOTED on the link line, where whitespace, "(" and "#" also end it.
+local SYSTEM_LIBRARY_SHAPE = "^[%w_%.%+%-/:]+$"
+
+--- Words target_link_libraries reads as keywords, so an entry spelled like one
+--- would change how the rest of the line is read rather than name a library.
+local LINK_KEYWORDS = {
+  PRIVATE = true, PUBLIC = true, INTERFACE = true, LINK_PRIVATE = true, LINK_PUBLIC = true,
+  LINK_INTERFACE_LIBRARIES = true, debug = true, optimized = true, general = true,
+}
+
+local function system_library_list(value, key)
+  local list = string_list(value, key, "library names", "library name")
+  if list == nil then return nil end
+  for index = 1, #list do
+    local library = list[index]
+    if library == "" then
+      error(string.format('"%s" holds an empty library name', key), 0)
+    end
+    if string.match(library, SYSTEM_LIBRARY_SHAPE) == nil then
+      error(string.format('"%s" may name a library with only letters, digits and "_", ".", "+",'
+                          .. ' "-", "/", ":", and "%s" is not one: it lands unquoted on the'
+                          .. ' generated link line, where anything else could end or rewrite it',
+                          key, library), 0)
+    end
+    if LINK_KEYWORDS[library] then
+      error(string.format('"%s" names "%s", which target_link_libraries reads as a keyword'
+                          .. ' and not as a library', key, library), 0)
+    end
+  end
+  return list
+end
+
 local function scalar_version(value, key)
   if value == nil then return nil end
   local kind = type(value)
@@ -95,5 +128,6 @@ return {
   string_list = string_list,
   cmake_text_list = cmake_text_list,
   path_list = path_list,
+  system_library_list = system_library_list,
   scalar_version = scalar_version,
 }

@@ -1,0 +1,1 @@
+A library the host provides, such as "m" or "pthread", goes in "systemLinks"

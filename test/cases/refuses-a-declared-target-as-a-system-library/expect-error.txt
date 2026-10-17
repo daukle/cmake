@@ -1,0 +1,1 @@
+it belongs in "links", where a misspelling is caught

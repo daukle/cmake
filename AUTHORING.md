@@ -58,7 +58,8 @@ version = "4.4"
 | `buildType` | `"Debug"` | the CMake build type |
 | `generator` | none | passed to `-G`; see the generator note below |
 | `compiler` | none | a `daukle/c` clang version, e.g. `"21"`. Provisions that compiler AND Ninja and drives the build with both; see below |
-| `configureArgs`, `buildArgs`, `runArgs` | none | passed through verbatim |
+| `systemLinks` | none | libraries the HOST provides, e.g. `["m", "pthread"]`; see below. Moves onto each target when `targets` is declared |
+| `configureArgs`, `buildArgs`, `runArgs` | none | passed through verbatim, to CMake and never to your program; see below |
 | `targets` | none | a list of targets; see below. Declaring it moves `kind`, `sources`, `includes`, `defines` and `standard` onto each target |
 | `default` | the only executable | which executable `cmake:run` means, when there is more than one |
 
@@ -83,13 +84,28 @@ version = "4.4"
   links   = ["greet"]
 ```
 
-A target owns `name`, `kind`, `sources`, `includes`, `defines`, `standard` and `links`; everything
-else stays project wide. **A project-wide `sources` beside `targets` is refused** rather than
+A target owns `name`, `kind`, `sources`, `includes`, `defines`, `standard`, `links` and
+`systemLinks`; everything else stays project wide. **A project-wide `sources` beside `targets` is refused** rather than
 silently applying to none of them.
 
 **`links` names another declared target or a package the resolver fetches, and anything else is
 refused where the manifest is read.** CMake reports an unknown link as a missing library at LINK
 time with no mention of the manifest, which is a long way from the typo.
+
+**A library the host provides goes in `systemLinks`**, which is a separate key so that the check
+above stays a check: `m`, `rt`, `pthread`, `winhttp` or `D3D11.lib` is not something this manifest
+can verify, so it is written to the link line as named, after `links`, with the same `PRIVATE`
+visibility. On the one-target shape `systemLinks` is project wide, beside the fetched packages that
+target already links.
+
+- An entry holds only letters, digits, `_`, `.`, `+`, `-`, `/` and `:`, because it lands
+  **unquoted** on `target_link_libraries`, where a space, a parenthesis, `#`, `$`, `;` or a quote
+  would end it or rewrite it. A flag such as `-pthread` and an absolute path both fit.
+- A `target_link_libraries` keyword (`PRIVATE`, `PUBLIC`, `INTERFACE`, `debug`, `optimized`,
+  `general`, `LINK_PRIVATE`, `LINK_PUBLIC`, `LINK_INTERFACE_LIBRARIES`) is refused, since CMake
+  would read it as a keyword rather than a library.
+- A name the manifest declares or fetches is refused there and belongs in `links`, so nothing
+  escapes the typo check by being moved to the other key.
 
 **A target name becomes part of a task name**, so it holds only letters, digits, `.`, `_` and `-`,
 may not be `build`, `run` or `configure`, and two targets whose names differ only in case are
@@ -155,9 +171,16 @@ would otherwise build the wrong thing in silence.
 
 **Anything interpolated into the generated file is refused if it carries a CMake metacharacter**
 (`"`, `\`, `$`, `)`, `;`, or a newline). That covers `sources`, `includes`, `defines` and
-`standard`, plus a dependency's `url` and `sha256`. It deliberately does **not** cover
-`configureArgs`, `buildArgs` or `runArgs`: those reach the process as argv and never enter the
-generated file, which is exactly why they are the escape hatch for anything the rule refuses.
+`standard`, plus a dependency's `url` and `sha256`; `systemLinks` has the stricter rule above. It
+deliberately does **not** cover `configureArgs`, `buildArgs` or `runArgs`: those reach the process
+as argv and never enter the generated file, which is exactly why they are the escape hatch for
+anything the rule refuses.
+
+**The process `runArgs` reach is CMake, not your program.** `cmake:run` execs
+`cmake --build _b --target run --config <buildType>` with `runArgs` appended, so they are options
+to CMake's build driver (`-j 4`, `--verbose`, or `--` followed by native build tool options). The
+program itself is launched by the generated `run` target with a fixed command and **receives no
+arguments**; nothing in this toolchain passes it any.
 
 ## What you must have installed
 
