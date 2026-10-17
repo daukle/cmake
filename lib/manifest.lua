@@ -62,6 +62,27 @@ local function dependencies_of(context)
   return out
 end
 
+--- @implNote the generated file sets RUNTIME_OUTPUT_DIRECTORY on every
+--- executable so cmake:run can find it, and a target property beats the
+--- variable, so this argument would be ignored in silence rather than obeyed.
+--- A project of libraries alone keeps it, since there it still places DLLs.
+local function refuse_a_runtime_directory(configure_args, project_targets)
+  if configure_args == nil then return end
+  local has_executable = false
+  for index = 1, #project_targets do
+    if project_targets[index].kind == "executable" then has_executable = true end
+  end
+  if not has_executable then return end
+  for index = 1, #configure_args do
+    if string.find(configure_args[index], "CMAKE_RUNTIME_OUTPUT_DIRECTORY", 1, true) ~= nil then
+      error('"configureArgs" sets CMAKE_RUNTIME_OUTPUT_DIRECTORY, which this toolchain owns for'
+            .. ' every executable: it places them in _b/bin so cmake:run can find the binary'
+            .. ' whatever the generator, and would silently override yours. Remove "'
+            .. configure_args[index] .. '"', 0)
+    end
+  end
+end
+
 local function reject_unknown_keys(config)
   for key in pairs(config) do
     if targets.KNOWN_KEYS[key] == nil then
@@ -122,6 +143,10 @@ local function read(context)
           .. ' host\'s compiler', 0)
   end
 
+  local configure_args = values.string_list(config.configureArgs, "configureArgs", "arguments",
+                                            "argument")
+  refuse_a_runtime_directory(configure_args, project_targets)
+
   return {
     version = version_of(context),
     language = language,
@@ -133,8 +158,7 @@ local function read(context)
     buildType = build_type or "Debug",
     generator = generator,
     compiler = compiler,
-    configureArgs = values.string_list(config.configureArgs, "configureArgs", "arguments",
-                                       "argument"),
+    configureArgs = configure_args,
     buildArgs = values.string_list(config.buildArgs, "buildArgs", "arguments", "argument"),
     runArgs = values.string_list(config.runArgs, "runArgs", "arguments", "argument"),
     dependencies = dependencies,

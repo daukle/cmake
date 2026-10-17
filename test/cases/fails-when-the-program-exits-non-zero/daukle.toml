@@ -1,0 +1,11 @@
+schema = 1
+project = "example/app"
+version = "1.0.0"
+
+[modules]
+
+[plugins]
+cmake = "./plugins/cmake"
+
+[toolchains.cmake]
+version = "4.4"
