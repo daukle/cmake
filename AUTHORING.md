@@ -59,7 +59,7 @@ version = "4.4"
 | `generator` | none | passed to `-G`; see the generator note below |
 | `compiler` | none | a `daukle/c` clang version, e.g. `"21"`. Provisions that compiler AND Ninja and drives the build with both; see below |
 | `systemLinks` | none | libraries the HOST provides, e.g. `["m", "pthread"]`; see below. Moves onto each target when `targets` is declared |
-| `configureArgs`, `buildArgs`, `runArgs` | none | passed through verbatim |
+| `configureArgs`, `buildArgs`, `runArgs` | none | passed through verbatim, to CMake and never to your program; see below |
 | `targets` | none | a list of targets; see below. Declaring it moves `kind`, `sources`, `includes`, `defines` and `standard` onto each target |
 | `default` | the only executable | which executable `cmake:run` means, when there is more than one |
 
@@ -175,6 +175,12 @@ would otherwise build the wrong thing in silence.
 deliberately does **not** cover `configureArgs`, `buildArgs` or `runArgs`: those reach the process
 as argv and never enter the generated file, which is exactly why they are the escape hatch for
 anything the rule refuses.
+
+**The process `runArgs` reach is CMake, not your program.** `cmake:run` execs
+`cmake --build _b --target run --config <buildType>` with `runArgs` appended, so they are options
+to CMake's build driver (`-j 4`, `--verbose`, or `--` followed by native build tool options). The
+program itself is launched by the generated `run` target with a fixed command and **receives no
+arguments**; nothing in this toolchain passes it any.
 
 ## What you must have installed
 
