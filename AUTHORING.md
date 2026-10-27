@@ -36,8 +36,9 @@ One generated `CMakeLists.txt` under `build/daukle/cmake/`, and nothing in your 
 using this toolchain holds `daukle.toml` and `src/` and no build file of its own. Do not edit the
 generated file: every `sync` overwrites it.
 
-The modelled surface is **one target**. `configureArgs`, `buildArgs` and `runArgs` are the escape
-hatch for everything the keys below do not reach, and they are passed through verbatim.
+The modelled surface is **one or more targets**: one named after the project by default, or the
+list in `targets`. `configureArgs`, `buildArgs` and `runArgs` are the escape hatch for everything
+the keys below do not reach, and they are passed through verbatim.
 
 ## The toolchain block
 
@@ -59,7 +60,8 @@ version = "4.4"
 | `generator` | none | passed to `-G`; see the generator note below |
 | `compiler` | none | a `daukle/c` clang version, e.g. `"21"`. Provisions that compiler AND Ninja and drives the build with both; see below |
 | `systemLinks` | none | libraries the HOST provides, e.g. `["m", "pthread"]`; see below. Moves onto each target when `targets` is declared |
-| `configureArgs`, `buildArgs`, `runArgs` | none | passed through verbatim, to CMake and never to your program; see below |
+| `configureArgs`, `buildArgs` | none | passed through verbatim to CMake's configure and build steps; see below |
+| `runArgs` | none | your program's argv under `cmake:run` and `cmake:run-<name>`, verbatim; see below |
 | `targets` | none | a list of targets; see below. Declaring it moves `kind`, `sources`, `includes`, `defines` and `standard` onto each target |
 | `default` | the only executable | which executable `cmake:run` means, when there is more than one |
 
@@ -176,11 +178,21 @@ deliberately does **not** cover `configureArgs`, `buildArgs` or `runArgs`: those
 as argv and never enter the generated file, which is exactly why they are the escape hatch for
 anything the rule refuses.
 
-**The process `runArgs` reach is CMake, not your program.** `cmake:run` execs
-`cmake --build _b --target run --config <buildType>` with `runArgs` appended, so they are options
-to CMake's build driver (`-j 4`, `--verbose`, or `--` followed by native build tool options). The
-program itself is launched by the generated `run` target with a fixed command and **receives no
-arguments**; nothing in this toolchain passes it any.
+**`runArgs` are your program's argv, verbatim.** `cmake:run` and `cmake:run-<name>` exec the
+executable the build produced directly, through `daukle.built`, with `runArgs` as its arguments and
+nothing in between: no shell, no CMake, and never a generated file. A space, `$`, `;` or a quote
+reaches the program exactly as written in the manifest. This needs a daukle carrying
+`daukle.built`; an older core refuses the plugin at load, naming the verb.
+
+**A program that exits non-zero fails the task**, with `the program "<name>" exited with code <n>`.
+
+**Every executable is written to `build/daukle/cmake/_b/bin/`**, whatever the generator, which is
+how the run task knows the binary's path: the generated file sets `RUNTIME_OUTPUT_DIRECTORY` on
+each executable target, with a generator expression so that a multi-config generator such as Visual
+Studio does not append `Debug/` or `Release/`. A target property beats the
+`CMAKE_RUNTIME_OUTPUT_DIRECTORY` variable, so **a `configureArgs` entry setting that variable is
+refused** in a project with an executable, rather than silently ignored. A project of libraries
+alone keeps it.
 
 ## What you must have installed
 
@@ -252,7 +264,8 @@ not a defect, and it is the reason `cc` rather than this plugin is where reporti
 
 **`cmake:run` runs your program from the CMake binary directory**, `build/daukle/cmake/_b`, not
 from your project root and not from the derived directory. A program writing `ran.txt` writes it
-there. Measured, not assumed.
+there. That was where the generated run targets launched it, and the run task kept it when it
+started exec'ing the program itself, so no relative path a program writes moved.
 
 **Bumping the pinned CMake does not require `daukle clean`.** Measured on 2026-09-29 by building
 with 4.4.3, repinning to 4.4.2 and rebuilding into the same `_b/`: CMake noticed the new
@@ -352,8 +365,11 @@ fail on Windows for a reason that has nothing to do with the plugin.
 
 ## Limits
 
-The compiler a build uses is reported by nothing. That is this plugin's stated narrowing rather
-than a gap: CMake picks it, and nothing here asks which.
+CMake picks the compiler unless `compiler` provisions one, and the generated `CMakeLists.txt`
+prints which on every configure, id, version and path (`D-186`). CMake prints its own
+identification line only when it first detects the compiler, measured on 4.4: a second configure
+from the same cache prints none, which `names-the-compiler-on-a-cached-configure` proves with the
+harness's `rerun` marker.
 
 **`cmake:<target>` and `cmake:run-<target>` now exist**, and the paragraph here said they could not
 until `D-110` resolved. It has: core publishes `daukle.manifest`, so registration reads the manifest

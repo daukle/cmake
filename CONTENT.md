@@ -18,10 +18,7 @@ duplication only ever read as a collision while the layer between them was unbui
 `modules = ["deps"]` on the `[plugins]` line and it loads with its own narrow grant, without the
 toolchain.
 
-## One target, and the narrowing has already cost something
-
-A project with two targets is not modellable. That is not theoretical: the one real CMake
-application in this organization had two, which is why it could not migrate and is archived.
+## What is still narrowed
 
 **The compiler a build actually used is reported by nothing.** That is this plugin's stated
 narrowing rather than a defect, and it matters most with the optional provisioned compiler, where

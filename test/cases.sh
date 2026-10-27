@@ -60,7 +60,7 @@ run_case() {
     rm -rf "$sandbox/expected" "$sandbox/expect-error.txt" \
            "$sandbox/task.txt" "$sandbox/produces.txt" \
            "$sandbox/expect-task-error.txt" "$sandbox/expect-output.txt" \
-           "$sandbox/expect-tasks.txt" "$sandbox/expect-no-tasks.txt"
+           "$sandbox/expect-tasks.txt" "$sandbox/expect-no-tasks.txt" "$sandbox/rerun"
     stage_plugin "$sandbox"
 
     # A case whose manifest has to carry a digest of something on disk builds
@@ -170,6 +170,13 @@ run_case() {
       fi
       if ! (cd "$sandbox" && "$daukle" "$task" >stdout.txt 2>stderr.txt); then
         fail "$name/$manifest_name" "task $task failed"
+        sed -n '1,40p' "$sandbox/stderr.txt" >&2
+        continue
+      fi
+      # A second run sees CMake's cache, which is where a line printed only on
+      # first detection disappears; the output asserted is then the second run's.
+      if [ -f "$case_dir/rerun" ] && ! (cd "$sandbox" && "$daukle" "$task" >stdout.txt 2>stderr.txt); then
+        fail "$name/$manifest_name" "task $task failed on its second run"
         sed -n '1,40p' "$sandbox/stderr.txt" >&2
         continue
       fi

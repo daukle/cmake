@@ -1,3 +1,15 @@
+local RUNTIME_DIRECTORY = "bin"
+
+--- The line that names the compiler a configure used: id, version and path.
+--- @implNote CMake prints "The C compiler identification is ..." only on the
+--- configure that detects the compiler and caches it, so every later run's log,
+--- cmake:build's included, would otherwise not say which compiler built it (D-186).
+local function compiler_report(language)
+  return string.format('message(STATUS "daukle: %s compiler ${CMAKE_%s_COMPILER_ID}'
+                       .. ' ${CMAKE_%s_COMPILER_VERSION} at ${CMAKE_%s_COMPILER}")',
+                       language, language, language, language)
+end
+
 local function render(spec)
   local out = {}
   local function put(line) out[#out + 1] = line end
@@ -18,14 +30,15 @@ local function render(spec)
     put(")")
   end
 
-  --- @implNote No verb can execute a binary the build produced, so CMake
-  --- launches it. add_dependencies orders it: a DEPENDS clause on
-  --- add_custom_target names files, not targets, and would let run execute a
-  --- stale binary. VERBATIM is the only portable escaping for the command.
-  local function put_run_target(name, target)
-    put(string.format('add_custom_target(%s COMMAND "$<TARGET_FILE:%s>" USES_TERMINAL VERBATIM)',
-                      name, target.name))
-    put(string.format("add_dependencies(%s %s)", name, target.name))
+  --- Puts every executable at one path whatever the generator, so cmake:run can
+  --- name the binary to daukle.built without knowing which generator CMake chose.
+  --- @implNote the generator expression is what stops a multi-config generator
+  --- appending its per-configuration subdirectory, for every configuration
+  --- including one the user defines, which listing the four standard
+  --- RUNTIME_OUTPUT_DIRECTORY_<CONFIG> variants would miss.
+  local function put_runtime_directory(target)
+    put(string.format('set_target_properties(%s PROPERTIES RUNTIME_OUTPUT_DIRECTORY'
+                      .. ' "$<1:${CMAKE_BINARY_DIR}/%s>")', target.name, RUNTIME_DIRECTORY))
   end
 
   local function variable_for(index)
@@ -42,6 +55,7 @@ local function render(spec)
       put(string.format("add_library(%s ${%s})", target.name, variable))
     else
       put(string.format("add_executable(%s ${%s})", target.name, variable))
+      put_runtime_directory(target)
     end
 
     local linked = {}
@@ -80,6 +94,7 @@ local function render(spec)
 
   put("cmake_minimum_required(VERSION 3.20)")
   put(string.format("project(%s LANGUAGES %s)", spec.project_name, spec.cmake_language))
+  put(compiler_report(spec.cmake_language))
   put("")
 
   if #spec.dependencies > 0 then
@@ -98,23 +113,7 @@ local function render(spec)
     put_target(spec.targets[index], index)
   end
 
-  --[[ One run- target per executable, and a bare "run" only where it is
-       unambiguous. A project with two executables and no "default" still
-       builds; it is cmake:run that has nothing to mean, and that is the run
-       TASK's error to raise rather than a reason to refuse the whole file. ]]
-  for index = 1, #spec.targets do
-    local target = spec.targets[index]
-    if target.kind == "executable" then
-      put("")
-      put_run_target("run-" .. target.task, target)
-    end
-  end
-  if spec.default ~= nil then
-    put("")
-    put_run_target("run", spec.default)
-  end
-
   return table.concat(out, "\n") .. "\n"
 end
 
-return { render = render }
+return { render = render, RUNTIME_DIRECTORY = RUNTIME_DIRECTORY }

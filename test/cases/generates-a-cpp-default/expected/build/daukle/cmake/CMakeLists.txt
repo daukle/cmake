@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(app LANGUAGES CXX)
+message(STATUS "daukle: CXX compiler ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION} at ${CMAKE_CXX_COMPILER}")
 
 file(GLOB DAUKLE_SOURCES CONFIGURE_DEPENDS
      "${CMAKE_CURRENT_SOURCE_DIR}/../../../src/*.cpp"
@@ -8,9 +9,4 @@ file(GLOB DAUKLE_SOURCES CONFIGURE_DEPENDS
 )
 
 add_executable(app ${DAUKLE_SOURCES})
-
-add_custom_target(run-app COMMAND "$<TARGET_FILE:app>" USES_TERMINAL VERBATIM)
-add_dependencies(run-app app)
-
-add_custom_target(run COMMAND "$<TARGET_FILE:app>" USES_TERMINAL VERBATIM)
-add_dependencies(run app)
+set_target_properties(app PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${CMAKE_BINARY_DIR}/bin>")
