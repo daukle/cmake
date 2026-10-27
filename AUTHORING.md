@@ -365,8 +365,11 @@ fail on Windows for a reason that has nothing to do with the plugin.
 
 ## Limits
 
-The compiler a build uses is reported by nothing. That is this plugin's stated narrowing rather
-than a gap: CMake picks it, and nothing here asks which.
+CMake picks the compiler unless `compiler` provisions one, and the generated `CMakeLists.txt`
+prints which on every configure, id, version and path (`D-186`). CMake prints its own
+identification line only when it first detects the compiler, measured on 4.4: a second configure
+from the same cache prints none, which `names-the-compiler-on-a-cached-configure` proves with the
+harness's `rerun` marker.
 
 **`cmake:<target>` and `cmake:run-<target>` now exist**, and the paragraph here said they could not
 until `D-110` resolved. It has: core publishes `daukle.manifest`, so registration reads the manifest

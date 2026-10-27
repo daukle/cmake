@@ -1,5 +1,15 @@
 local RUNTIME_DIRECTORY = "bin"
 
+--- The line that names the compiler a configure used: id, version and path.
+--- @implNote CMake prints "The C compiler identification is ..." only on the
+--- configure that detects the compiler and caches it, so every later run's log,
+--- cmake:build's included, would otherwise not say which compiler built it (D-186).
+local function compiler_report(language)
+  return string.format('message(STATUS "daukle: %s compiler ${CMAKE_%s_COMPILER_ID}'
+                       .. ' ${CMAKE_%s_COMPILER_VERSION} at ${CMAKE_%s_COMPILER}")',
+                       language, language, language, language)
+end
+
 local function render(spec)
   local out = {}
   local function put(line) out[#out + 1] = line end
@@ -84,6 +94,7 @@ local function render(spec)
 
   put("cmake_minimum_required(VERSION 3.20)")
   put(string.format("project(%s LANGUAGES %s)", spec.project_name, spec.cmake_language))
+  put(compiler_report(spec.cmake_language))
   put("")
 
   if #spec.dependencies > 0 then

@@ -46,8 +46,14 @@ same line, with its own grant and without the toolchain, from `daukle 0.9.0`:
 cmake = { resolver = "github", coordinate = "daukle/cmake@^1.5.0", modules = ["deps"] }
 ```
 
+## Which compiler a build used
+
+Every configure prints it, `daukle: C compiler Clang 21.1.8 at <path>` for the provisioned
+compiler and the host's alike. CMake's own "The C compiler identification is" line appears only on
+the configure that first detects the compiler, so without this a later run's log, `cmake:build`'s
+included, would not say.
+
 ## What it does not do
 
-The compiler a build actually used is reported by nothing, which is this plugin's stated narrowing
-rather than a defect. Several executables and libraries in one project are modelled through
+Several executables and libraries in one project are modelled through
 `targets`; see `AUTHORING.md`.
