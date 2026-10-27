@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(app LANGUAGES C)
+message(STATUS "daukle: C compiler ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION} at ${CMAKE_C_COMPILER}")
 
 include(FetchContent)
 FetchContent_Declare(basekit-ir URL "https://example.test/ir.tar.gz" URL_HASH "SHA256=deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
