@@ -14,9 +14,8 @@ That layering is the point of having a C **base** separate from a C **build syst
 repositories are not two attempts at CMake, they are a base and the build tool above it. The
 duplication only ever read as a collision while the layer between them was unbuilt.
 
-`modules/deps.lua` writes the `FetchContent` blocks. It is a module of this plugin: name it with
-`modules = ["deps"]` on the `[plugins]` line and it loads with its own narrow grant, without the
-toolchain.
+Dependencies are declared under `[toolchains.cmake.dependencies]` and become `FetchContent`
+blocks in the generated file.
 
 ## What is still narrowed
 

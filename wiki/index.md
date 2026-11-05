@@ -38,12 +38,14 @@ on Linux with no `make`.
 
 ## Dependencies
 
-The dependency writer is a MODULE of this plugin and writes `FetchContent` blocks. Name it on the
-same line, with its own grant and without the toolchain, from `daukle 0.9.0`:
+Each dependency is resolved through a `[sources]` entry, and the module's `cmake` block, a
+`package`, a `url` and a required `sha256`, becomes a `FetchContent` declaration linked into the
+target:
 
 ```toml
-[plugins]
-cmake = { resolver = "github", coordinate = "daukle/cmake@^1.5.0", modules = ["deps"] }
+[toolchains.cmake.dependencies."forebay/basekit"]
+version = "^5.0.0"
+modules = ["ir"]
 ```
 
 ## Which compiler a build used
