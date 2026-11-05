@@ -6,30 +6,6 @@ and `lib/values` checking each value; `lib/generate` renders that spec into
 `CMakeLists.txt`; `lib/cmakes` holds the pinned archive table. Only `lib/manifest` reads
 `context.config` or `context.toolchain`.
 
-## This repository publishes two plugins
-
-A release carries two assets, and they are different plugins with different jobs.
-
-`plugin.lua` is the **managed toolchain** this document is about: daukle owns the generated
-build file, provisions CMake and runs it.
-
-`modules/deps.lua` is a **dependency writer**: it edits a `CMakeLists.txt` that YOU own and
-maintain, writing a `FetchContent` block into a `# daukle:begin` region, and it needs CMake already
-installed. **It is a MODULE of this plugin** (`daukle 0.9.0`, `D-134`), so a project names it on the
-same `[plugins]` line and gets ITS grant, `region`, and not the toolchain's `exec`:
-
-```toml
-[plugins]
-cmake = { resolver = "github", coordinate = "daukle/cmake@^1.5.0", modules = ["deps"] }
-# or both: modules = ["main", "deps"]
-```
-
-**The raw `deps.lua` asset is still published beside the tar for one release**, so a manifest
-using the old two-resolver form (`[resolvers.github-deps]` with `asset = "deps.lua"`) keeps working
-until it moves to the line above. `deps.lua` lived in `daukle/c` until 1.0.1, where it was
-misfiled: it is about CMake's syntax and CMake's dependency mechanism, and about C only in the
-sense that CMake is mostly used for C.
-
 ## What this plugin owns
 
 One generated `CMakeLists.txt` under `build/daukle/cmake/`, and nothing in your tree. A repository
@@ -276,7 +252,8 @@ still the first thing to try.
 
 ## Dependencies
 
-A resolved module's `cmake` block becomes one `FetchContent_Declare` plus one
+A project declares them under `[toolchains.cmake.dependencies]`, each resolved through a
+`[sources]` entry, and a resolved module's `cmake` block becomes one `FetchContent_Declare` plus one
 `FetchContent_MakeAvailable`, and all of them become a single `target_link_libraries`.
 
 ```toml
@@ -286,9 +263,7 @@ A resolved module's `cmake` block becomes one `FetchContent_Declare` plus one
   sha256 = "..."
 ```
 
-**`sha256` is required here, and optional in `daukle/c`.** The difference is deliberate:
-`daukle/c` edits a region of a file you wrote and read, so an unverified download is at least
-visible in your own tree. This plugin writes a file you are told not to read, so an unverified
+**`sha256` is required.** This plugin writes a file you are told not to read, so an unverified
 download would be invisible. It must be exactly 64 hex digits, `package` must be usable as a
 CMake target name, and `url` may carry no CMake metacharacter: all three land in the same
 generated statement, so validating only one of them would close one field of three.
