@@ -40,7 +40,6 @@ stage_plugin() {
   if [ -d "$root/lib" ]; then
     cp -R "$root/lib" "$1/plugins/cmake/lib"
   fi
-  cp -R "$root/modules" "$1/plugins/cmake/modules"
 }
 
 run_case() {
