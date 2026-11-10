@@ -1,0 +1,1 @@
+targets[1].publicLinks names "gret", which is neither another target
