@@ -1,0 +1,1 @@
+targets[2].links names "plugin", a "module" library, which is loaded at run time and cannot be linked

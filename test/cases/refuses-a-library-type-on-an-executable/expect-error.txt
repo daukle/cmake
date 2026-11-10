@@ -1,0 +1,1 @@
+targets[1] declares "libraryType" and is an executable: only a library has one
