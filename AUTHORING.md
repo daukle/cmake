@@ -63,8 +63,16 @@ version = "4.4"
 ```
 
 A target owns `name`, `kind`, `sources`, `includes`, `defines`, `standard`, `links` and
-`systemLinks`; everything else stays project wide. **A project-wide `sources` beside `targets` is refused** rather than
-silently applying to none of them.
+`systemLinks`, and a library also `publicIncludes`, `publicDefines`, `publicLinks`,
+`interfaceIncludes`, `interfaceDefines` and `interfaceLinks`; everything else stays project wide.
+**A project-wide `sources` beside `targets` is refused** rather than silently applying to none of them.
+
+**`includes`, `defines` and `links` are `PRIVATE`: they build the target and reach nothing that
+links it.** The `public*` keys are CMake's `PUBLIC` (the target and everything linking it) and the
+`interface*` keys its `INTERFACE` (only what links it), so a library's header directory in
+`publicIncludes` reaches the executable that links the library. They are refused on an
+executable, which nothing links, and on the one-target shape, which has nothing to link it.
+`publicLinks` and `interfaceLinks` take the same names, and get the same check, as `links`.
 
 **`links` names another declared target or a package the resolver fetches, and anything else is
 refused where the manifest is read.** CMake reports an unknown link as a missing library at LINK

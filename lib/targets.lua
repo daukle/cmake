@@ -20,6 +20,16 @@ local KNOWN_KEYS = {
 local TARGET_KEYS = {
   name = true, kind = true, sources = true, includes = true, defines = true,
   standard = true, links = true, systemLinks = true,
+  publicIncludes = true, interfaceIncludes = true, publicDefines = true, interfaceDefines = true,
+  publicLinks = true, interfaceLinks = true,
+}
+
+--- The keys whose values reach a target's consumers, CMake's `PUBLIC` and `INTERFACE` usage
+--- requirements; `includes`, `defines` and `links` stay `PRIVATE`.
+local PRIVATE_KEY_OF = {
+  publicIncludes = "includes", interfaceIncludes = "includes",
+  publicDefines = "defines", interfaceDefines = "defines",
+  publicLinks = "links", interfaceLinks = "links",
 }
 
 -- A target becomes a task, and core refuses a task name that is not lowercase
@@ -89,13 +99,28 @@ end
 --- library the HOST provides is the one other kind, and it has its own key,
 --- "systemLinks", precisely so that anything else in "links" stays a typo.
 local function refuse_an_unknown_link(target, index, declared, package_names)
-  for link_index = 1, #target.links do
-    local link = target.links[link_index]
-    if not declared[link] and not package_names_hold(package_names, link) then
-      error(string.format('targets[%d] links "%s", which is neither another target this'
-                          .. ' manifest declares nor a package it fetches. A library the host'
-                          .. ' provides, such as "m" or "pthread", goes in "systemLinks"',
-                          index, link), 0)
+  for _, key in ipairs({ "links", "publicLinks", "interfaceLinks" }) do
+    for link_index = 1, #target[key] do
+      local link = target[key][link_index]
+      if not declared[link] and not package_names_hold(package_names, link) then
+        error(string.format('targets[%d].%s names "%s", which is neither another target this'
+                            .. ' manifest declares nor a package it fetches. A library the host'
+                            .. ' provides, such as "m" or "pthread", goes in "systemLinks"',
+                            index, key, link), 0)
+      end
+    end
+  end
+end
+
+--- An executable has no consumer for a usage requirement to reach, so one written on it would
+--- change nothing and say otherwise.
+local function refuse_usage_requirements_on_an_executable(entry, kind, at)
+  if kind ~= "executable" then return end
+  for key, private_key in pairs(PRIVATE_KEY_OF) do
+    if entry[key] ~= nil then
+      error(string.format('%s is an executable and declares "%s": nothing links an executable,'
+                          .. ' so it has no consumer for that to reach. Write it as "%s"',
+                          at, key, private_key), 0)
     end
   end
 end
@@ -144,6 +169,7 @@ local function targets_of(config, language, project_target, package_names)
       standard = values.scalar_version(config.standard, "standard"),
       links = package_names,
       systemLinks = values.system_library_list(config.systemLinks, "systemLinks") or {},
+      publicLinks = {}, interfaceLinks = {},
     }
     refuse_a_known_name_as_a_system_library(only, "systemLinks", { [project_target] = true },
                                             package_names)
@@ -187,6 +213,7 @@ local function targets_of(config, language, project_target, package_names)
       error(string.format('%s has a "kind" that must be "executable" or "library", not "%s"',
                           at, tostring(kind)), 0)
     end
+    refuse_usage_requirements_on_an_executable(entry, kind, at)
     local sources = values.path_list(entry.sources, at .. ".sources", "globs", "glob")
                     or default_sources(language)
     if #sources == 0 then
@@ -204,6 +231,18 @@ local function targets_of(config, language, project_target, package_names)
       links = values.cmake_text_list(entry.links, at .. ".links", "target names",
                                      "target name") or {},
       systemLinks = values.system_library_list(entry.systemLinks, at .. ".systemLinks") or {},
+      publicIncludes = values.path_list(entry.publicIncludes, at .. ".publicIncludes", "directories",
+                                        "directory"),
+      interfaceIncludes = values.path_list(entry.interfaceIncludes, at .. ".interfaceIncludes",
+                                           "directories", "directory"),
+      publicDefines = values.cmake_text_list(entry.publicDefines, at .. ".publicDefines",
+                                             "definitions", "definition"),
+      interfaceDefines = values.cmake_text_list(entry.interfaceDefines, at .. ".interfaceDefines",
+                                                "definitions", "definition"),
+      publicLinks = values.cmake_text_list(entry.publicLinks, at .. ".publicLinks", "target names",
+                                           "target name") or {},
+      interfaceLinks = values.cmake_text_list(entry.interfaceLinks, at .. ".interfaceLinks",
+                                              "target names", "target name") or {},
     }
   end
 

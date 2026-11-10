@@ -10,6 +10,17 @@ local function compiler_report(language)
                        language, language, language, language)
 end
 
+--- The non-empty lists of one usage requirement under their CMake keywords, `PRIVATE` first.
+local function visibility_groups(private, public, interface)
+  local groups = {}
+  for _, group in ipairs({ { "PRIVATE", private }, { "PUBLIC", public }, { "INTERFACE", interface } }) do
+    if group[2] ~= nil and #group[2] > 0 then
+      groups[#groups + 1] = { keyword = group[1], items = group[2] }
+    end
+  end
+  return groups
+end
+
 local function render(spec)
   local out = {}
   local function put(line) out[#out + 1] = line end
@@ -63,26 +74,39 @@ local function render(spec)
     for index_of_library = 1, #target.systemLinks do
       linked[#linked + 1] = target.systemLinks[index_of_library]
     end
-    if #linked > 0 then
-      put(string.format("target_link_libraries(%s PRIVATE %s)",
-                        target.name, table.concat(linked, " ")))
+    local link_groups = visibility_groups(linked, target.publicLinks, target.interfaceLinks)
+    if #link_groups > 0 then
+      local words = {}
+      for _, group in ipairs(link_groups) do
+        words[#words + 1] = group.keyword .. " " .. table.concat(group.items, " ")
+      end
+      put(string.format("target_link_libraries(%s %s)", target.name, table.concat(words, " ")))
     end
 
-    if target.includes ~= nil and #target.includes > 0 then
-      put(string.format("target_include_directories(%s PRIVATE", target.name))
-      for index_of_include = 1, #target.includes do
-        put("     " .. source_path(target.includes[index_of_include]))
+    local include_groups = visibility_groups(target.includes, target.publicIncludes,
+                                             target.interfaceIncludes)
+    for group_index, group in ipairs(include_groups) do
+      if group_index == 1 then
+        put(string.format("target_include_directories(%s %s", target.name, group.keyword))
+      else
+        put("    " .. group.keyword)
       end
-      put(")")
+      for _, include in ipairs(group.items) do put("     " .. source_path(include)) end
     end
+    if #include_groups > 0 then put(")") end
 
-    if target.defines ~= nil and #target.defines > 0 then
-      local quoted = {}
-      for index_of_define = 1, #target.defines do
-        quoted[index_of_define] = string.format('"%s"', target.defines[index_of_define])
+    local define_groups = visibility_groups(target.defines, target.publicDefines,
+                                            target.interfaceDefines)
+    if #define_groups > 0 then
+      local words = {}
+      for _, group in ipairs(define_groups) do
+        local quoted = {}
+        for index_of_define, define in ipairs(group.items) do
+          quoted[index_of_define] = string.format('"%s"', define)
+        end
+        words[#words + 1] = group.keyword .. " " .. table.concat(quoted, " ")
       end
-      put(string.format("target_compile_definitions(%s PRIVATE %s)",
-                        target.name, table.concat(quoted, " ")))
+      put(string.format("target_compile_definitions(%s %s)", target.name, table.concat(words, " ")))
     end
 
     if target.standard ~= nil then

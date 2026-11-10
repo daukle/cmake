@@ -1,0 +1,32 @@
+schema = 1
+project = "example/app"
+version = "1.0.0"
+
+[modules]
+
+[plugins]
+cmake = "./plugins/cmake"
+
+[toolchains.cmake]
+version = "4.4"
+
+  [[toolchains.cmake.targets]]
+  name             = "base"
+  kind             = "library"
+  sources          = ["src/base/*.c"]
+  interfaceIncludes = ["include/base"]
+
+  [[toolchains.cmake.targets]]
+  name             = "greet"
+  kind             = "library"
+  sources          = ["src/lib/*.c"]
+  includes         = ["src/lib"]
+  publicIncludes   = ["include"]
+  publicDefines    = ["GREET_BASE=7"]
+  interfaceDefines = ["GREET_CONSUMER=1"]
+  publicLinks      = ["base"]
+
+  [[toolchains.cmake.targets]]
+  name    = "app"
+  sources = ["src/app/*.c"]
+  links   = ["greet"]
