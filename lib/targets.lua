@@ -10,8 +10,12 @@ local KNOWN_KEYS = {
   version = true, language = true, kind = true, sources = true, includes = true,
   defines = true, standard = true, buildType = true, generator = true,
   configureArgs = true, buildArgs = true, runArgs = true, dependencies = true,
-  compiler = true, targets = true, default = true, systemLinks = true,
+  compiler = true, targets = true, default = true, systemLinks = true, libraryType = true,
 }
+
+--- A library target's `libraryType`, as the `add_library` keyword it renders. Without one the
+--- keyword is left out and `BUILD_SHARED_LIBS` decides, which is what this plugin always did.
+local LIBRARY_KEYWORDS = { static = "STATIC", shared = "SHARED", module = "MODULE", object = "OBJECT" }
 
 --[[ The five keys a TARGET owns. A project-wide key is not one of these: a
      generator or a build type is a property of the build, not of a thing the
@@ -19,7 +23,7 @@ local KNOWN_KEYS = {
      could ask for different generators. ]]
 local TARGET_KEYS = {
   name = true, kind = true, sources = true, includes = true, defines = true,
-  standard = true, links = true, systemLinks = true,
+  standard = true, links = true, systemLinks = true, libraryType = true,
   publicIncludes = true, interfaceIncludes = true, publicDefines = true, interfaceDefines = true,
   publicLinks = true, interfaceLinks = true,
 }
@@ -112,6 +116,33 @@ local function refuse_an_unknown_link(target, index, declared, package_names)
   end
 end
 
+--- The `add_library` keyword of a target's `libraryType`, or nil when it declares none.
+local function library_keyword_of(value, kind, at)
+  if value == nil then return nil end
+  if kind ~= "library" then
+    error(string.format('%s declares "libraryType" and is an executable: only a library has one', at), 0)
+  end
+  local keyword = type(value) == "string" and LIBRARY_KEYWORDS[value] or nil
+  if keyword == nil then
+    error(string.format('%s has a "libraryType" that must be "static", "shared", "module" or "object",'
+                        .. ' not "%s"', at, tostring(value)), 0)
+  end
+  return keyword
+end
+
+--- @implNote checked here because CMake refuses to link a MODULE library, at configure time and
+--- naming no manifest line: a module is loaded at run time, never linked.
+local function refuse_a_link_to_a_module(target, index, keyword_of)
+  for _, key in ipairs({ "links", "publicLinks", "interfaceLinks" }) do
+    for _, link in ipairs(target[key]) do
+      if keyword_of[link] == "MODULE" then
+        error(string.format('targets[%d].%s names "%s", a "module" library, which is loaded at run time'
+                            .. ' and cannot be linked: make it "shared" to link it', index, key, link), 0)
+      end
+    end
+  end
+end
+
 --- An executable has no consumer for a usage requirement to reach, so one written on it would
 --- change nothing and say otherwise.
 local function refuse_usage_requirements_on_an_executable(entry, kind, at)
@@ -163,6 +194,7 @@ local function targets_of(config, language, project_target, package_names)
       name = project_target,
       task = task_name_of(project_target),
       kind = kind,
+      libraryKeyword = library_keyword_of(config.libraryType, kind, "the project"),
       sources = sources,
       includes = values.path_list(config.includes, "includes", "directories", "directory"),
       defines = values.cmake_text_list(config.defines, "defines", "definitions", "definition"),
@@ -223,6 +255,7 @@ local function targets_of(config, language, project_target, package_names)
       name = name,
       task = task,
       kind = kind,
+      libraryKeyword = library_keyword_of(entry.libraryType, kind, at),
       sources = sources,
       includes = values.path_list(entry.includes, at .. ".includes", "directories", "directory"),
       defines = values.cmake_text_list(entry.defines, at .. ".defines", "definitions",
@@ -246,8 +279,11 @@ local function targets_of(config, language, project_target, package_names)
     }
   end
 
+  local keyword_of = {}
+  for _, target in ipairs(out) do keyword_of[target.name] = target.libraryKeyword end
   for index = 1, #out do
     refuse_an_unknown_link(out[index], index, declared, package_names)
+    refuse_a_link_to_a_module(out[index], index, keyword_of)
     refuse_a_known_name_as_a_system_library(out[index], 'targets[' .. index .. '].systemLinks',
                                             declared, package_names)
   end

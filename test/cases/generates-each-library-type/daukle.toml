@@ -1,0 +1,35 @@
+schema = 1
+project = "example/app"
+version = "1.0.0"
+
+[modules]
+
+[plugins]
+cmake = "./plugins/cmake"
+
+[toolchains.cmake]
+version = "4.4"
+
+  [[toolchains.cmake.targets]]
+  name        = "fixed"
+  kind        = "library"
+  libraryType = "static"
+  sources     = ["src/fixed/*.c"]
+
+  [[toolchains.cmake.targets]]
+  name        = "loaded"
+  kind        = "library"
+  libraryType = "shared"
+  sources     = ["src/loaded/*.c"]
+
+  [[toolchains.cmake.targets]]
+  name        = "plugin"
+  kind        = "library"
+  libraryType = "module"
+  sources     = ["src/plugin/*.c"]
+
+  [[toolchains.cmake.targets]]
+  name        = "parts"
+  kind        = "library"
+  libraryType = "object"
+  sources     = ["src/parts/*.c"]

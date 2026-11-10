@@ -63,7 +63,12 @@ local function render(spec)
     put("")
 
     if target.kind == "library" then
-      put(string.format("add_library(%s ${%s})", target.name, variable))
+      local keyword = target.libraryKeyword ~= nil and (target.libraryKeyword .. " ") or ""
+      put(string.format("add_library(%s %s${%s})", target.name, keyword, variable))
+      -- a DLL is a RUNTIME output, and the loader looks for it beside the executable
+      if target.libraryKeyword == "SHARED" or target.libraryKeyword == "MODULE" then
+        put_runtime_directory(target)
+      end
     else
       put(string.format("add_executable(%s ${%s})", target.name, variable))
       put_runtime_directory(target)

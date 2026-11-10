@@ -1,0 +1,1 @@
+has a "libraryType" that must be "static", "shared", "module" or "object", not "interface"

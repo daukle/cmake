@@ -74,6 +74,13 @@ links it.** The `public*` keys are CMake's `PUBLIC` (the target and everything l
 executable, which nothing links, and on the one-target shape, which has nothing to link it.
 `publicLinks` and `interfaceLinks` take the same names, and get the same check, as `links`.
 
+**A library's `libraryType` is `static`, `shared`, `module` or `object`**, rendered as that
+`add_library` keyword; without it no keyword is written and `BUILD_SHARED_LIBS` decides. A shared or
+module library is placed beside the executables, because on Windows its DLL is a runtime output the
+loader looks for there. Linking a `module` library is refused, since CMake loads one at run time and
+cannot link it. On Windows a shared library exports nothing unless its code says so, so a project
+without `__declspec(dllexport)` passes `-DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=ON` in `configureArgs`.
+
 **`links` names another declared target or a package the resolver fetches, and anything else is
 refused where the manifest is read.** CMake reports an unknown link as a missing library at LINK
 time with no mention of the manifest, which is a long way from the typo.
