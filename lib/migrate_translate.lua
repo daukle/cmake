@@ -70,13 +70,21 @@ local function default_flags_of(cache, language, configuration)
   return prefix
 end
 
+--- @implNote a fragment is command-line text, and one from `COMPILE_FLAGS` holds several flags;
+--- written as one option it would reach the compiler as one argument, so it is carried as
+--- `SHELL:`, which CMake splits the way the fragment was written.
+local function as_one_option(fragment)
+  if string.find(fragment, "%s") == nil then return fragment end
+  return "SHELL:" .. fragment
+end
+
 local function compile_options_of(group, cache, configuration)
   local options = {}
   local defaults = default_flags_of(cache, group.language or "C", configuration)
   for index, fragment in ipairs(group.compileCommandFragments or {}) do
     local is_default = index == 1 and defaults ~= nil
                        and string.sub(fragment.fragment, 1, #defaults) == defaults
-    if not is_default then options[#options + 1] = fragment.fragment end
+    if not is_default then options[#options + 1] = as_one_option(fragment.fragment) end
   end
   return options
 end
