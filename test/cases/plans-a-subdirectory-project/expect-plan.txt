@@ -1,0 +1,3 @@
+target app EXECUTABLE
+  source native/app/main.c
+  source native/core/core.c

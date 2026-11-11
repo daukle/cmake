@@ -59,7 +59,7 @@ run_case() {
     rm -rf "$sandbox/expected" "$sandbox/expect-error.txt" \
            "$sandbox/task.txt" "$sandbox/produces.txt" \
            "$sandbox/expect-task-error.txt" "$sandbox/expect-output.txt" \
-           "$sandbox/expect-tasks.txt" "$sandbox/expect-no-tasks.txt" "$sandbox/rerun"
+           "$sandbox/expect-tasks.txt" "$sandbox/expect-no-tasks.txt" "$sandbox/rerun"            "$sandbox/expect-plan.txt" "$sandbox/expect-plan-absent.txt"
     stage_plugin "$sandbox"
 
     # A case whose manifest has to carry a digest of something on disk builds
@@ -179,6 +179,9 @@ run_case() {
         sed -n '1,40p' "$sandbox/stderr.txt" >&2
         continue
       fi
+      if ! plan_carries_lines "$case_dir" "$sandbox" "$name/$manifest_name"; then
+        continue
+      fi
       # An example asserts on what the task PRINTED, which is what a reader
       # of the example came for. A test case asserts on the files produced.
       if [ -f "$case_dir/expect-output.txt" ]; then
@@ -235,6 +238,35 @@ run_case() {
     fi
     passed=$((passed + 1))
   done
+}
+
+# What a task's plan.txt must hold and must not, line for line: the plan is the file a migration's
+# proof compares, so a case asserts the lines a reader of the proof would look for.
+plan_carries_lines() {
+  plan="$2/build/daukle/cmake/plan.txt"
+  for list in expect-plan.txt expect-plan-absent.txt; do
+    [ -f "$1/$list" ] || continue
+    if ! grep -q . "$1/$list"; then
+      fail "$3" "$list is empty, so this case asserts nothing"
+      return 1
+    fi
+    if [ ! -f "$plan" ]; then
+      fail "$3" "the task wrote no plan.txt"
+      return 1
+    fi
+    while IFS= read -r line || [ -n "$line" ]; do
+      [ -n "$line" ] || continue
+      if [ "$list" = expect-plan.txt ] && ! grep -qxF -- "$line" "$plan"; then
+        fail "$3" "plan.txt lacks: $line"
+        return 1
+      fi
+      if [ "$list" = expect-plan-absent.txt ] && grep -qxF -- "$line" "$plan"; then
+        fail "$3" "plan.txt holds: $line"
+        return 1
+      fi
+    done < "$1/$list"
+  done
+  return 0
 }
 
 compare_expected() {

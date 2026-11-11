@@ -1,0 +1,9 @@
+target app EXECUTABLE
+target core STATIC_LIBRARY
+  source src/app/main.c
+  source src/core/core.c
+  include include
+  define CORE_PRIV=1
+  define HDR_ON=1
+  link core
+  link Threads::Threads
