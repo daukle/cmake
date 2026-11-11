@@ -1,5 +1,6 @@
 local file_api = daukle.require("lib/file_api")
 local plan = daukle.require("lib/plan")
+local migrate_tests = daukle.require("lib/migrate_tests")
 
 local READ_DIR = "migrate-read"
 local CMAKE_VERSION = "4.4"
@@ -28,21 +29,39 @@ local function instance_root_of(reply)
   return reply.source_root
 end
 
---- Configures the project's own CMake files once, with a file API query, and writes the old side
---- of the proof's plan.
---- @param provision_cmake function(context, version) -> tool handle of `cmake`
---- @return reply, project_root, the read's build directory relative to the project root
-local function read(context, provision_cmake)
-  file_api.write_query(READ_DIR)
-  local cmake = provision_cmake(context, CMAKE_VERSION)
-  daukle.exec(cmake, { "-S", ".", "-B", read_dir_from_project(context), "-DCMAKE_BUILD_TYPE=" .. BUILD_TYPE },
-              { cwd = context.dir or "." })
-  local build_dir = derived_of(context) .. "/" .. READ_DIR
-  local reply = file_api.read_reply(build_dir, BUILD_TYPE)
-  local root = instance_root_of(reply)
-  daukle.write{ path = READ_DIR .. "/" .. plan.FILE, text = plan.text(reply, root) }
-  return reply, root, build_dir
+--- The tests ctest lists in `build_dir`, building it first when ctest cannot name a program yet.
+--- @param build_dir relative to the directory the task or migrator runs in
+local function tests_of(cmake, ctest, build_dir, configuration)
+  local listed = migrate_tests.listed(ctest, build_dir, configuration)
+  if migrate_tests.needs_build(listed) then
+    daukle.exec(cmake, { "--build", build_dir, "--config", configuration })
+    listed = migrate_tests.listed(ctest, build_dir, configuration)
+  end
+  return listed
 end
 
-return { read = read, READ_DIR = READ_DIR, CMAKE_VERSION = CMAKE_VERSION, BUILD_TYPE = BUILD_TYPE,
+local function plan_lines(tests)
+  local lines = {}
+  for _, test in ipairs(tests) do lines[#lines + 1] = migrate_tests.plan_line(test) end
+  return lines
+end
+
+--- Configures the project's own CMake files once, with a file API query, and writes the old side
+--- of the proof's plan.
+--- @param provision function(context, version, program) -> tool handle of `cmake` or `ctest`
+--- @return { reply, root, tests, test_blockers }
+local function read(context, provision)
+  file_api.write_query(READ_DIR)
+  local cmake = provision(context, CMAKE_VERSION, "cmake")
+  daukle.exec(cmake, { "-S", ".", "-B", read_dir_from_project(context), "-DCMAKE_BUILD_TYPE=" .. BUILD_TYPE },
+              { cwd = context.dir or "." })
+  local reply = file_api.read_reply(derived_of(context) .. "/" .. READ_DIR, BUILD_TYPE)
+  local root = instance_root_of(reply)
+  local listed = tests_of(cmake, provision(context, CMAKE_VERSION, "ctest"), READ_DIR, BUILD_TYPE)
+  local tests, test_blockers = migrate_tests.of(listed, reply, root)
+  daukle.write{ path = READ_DIR .. "/" .. plan.FILE, text = plan.text(reply, root, plan_lines(tests)) }
+  return { reply = reply, root = root, tests = tests, test_blockers = test_blockers }
+end
+
+return { read = read, tests_of = tests_of, plan_lines = plan_lines, READ_DIR = READ_DIR, CMAKE_VERSION = CMAKE_VERSION, BUILD_TYPE = BUILD_TYPE,
          derived_of = derived_of }

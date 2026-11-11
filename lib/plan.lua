@@ -115,7 +115,8 @@ end
 --- The canonical description of a configured build that both sides of a migration's proof write.
 --- @param reply what `file_api.read_reply` returned
 --- @param project_root the project's absolute path, in any spelling CMake might use
-local function text(reply, project_root)
+--- @param test_lines one line per test, already sorted, from `migrate_tests.plan_line`
+local function text(reply, project_root, test_lines)
   local root = normalised(project_root)
   local names = {}
   for name, target in pairs(reply.targets) do
@@ -124,6 +125,7 @@ local function text(reply, project_root)
   table.sort(names)
   local blocks = {}
   for _, name in ipairs(names) do blocks[#blocks + 1] = target_block(reply, reply.targets[name], root) end
+  if test_lines ~= nil and #test_lines > 0 then blocks[#blocks + 1] = table.concat(test_lines, "\n") end
   return table.concat(blocks, "\n\n") .. "\n"
 end
 
