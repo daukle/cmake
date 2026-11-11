@@ -152,7 +152,8 @@ local function render(spec)
   end
 
   put("cmake_minimum_required(VERSION 3.20)")
-  put(string.format("project(%s LANGUAGES %s)", spec.project_name, spec.cmake_language))
+  local version = spec.project_version ~= nil and (" VERSION " .. spec.project_version) or ""
+  put(string.format("project(%s%s LANGUAGES %s)", spec.project_name, version, spec.cmake_language))
   put(compiler_report(spec.cmake_language))
   put("")
 
