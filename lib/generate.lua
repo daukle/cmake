@@ -57,11 +57,24 @@ local function render(spec)
     return "DAUKLE_SOURCES_" .. index
   end
 
-  local function put_target(target, index)
-    local variable = variable_for(index)
+  local function put_quoted_groups(command, target_name, groups)
+    if #groups == 0 then return end
+    local words = {}
+    for _, group in ipairs(groups) do
+      local quoted = {}
+      for index, item in ipairs(group.items) do quoted[index] = string.format('"%s"', item) end
+      words[#words + 1] = group.keyword .. " " .. table.concat(quoted, " ")
+    end
+    put(string.format("%s(%s %s)", command, target_name, table.concat(words, " ")))
+  end
+
+  local function put_declaration(target, variable)
+    if target.libraryKeyword == "INTERFACE" then
+      put(string.format("add_library(%s INTERFACE)", target.name))
+      return
+    end
     put_source_glob(target, variable)
     put("")
-
     if target.kind == "library" then
       local keyword = target.libraryKeyword ~= nil and (target.libraryKeyword .. " ") or ""
       put(string.format("add_library(%s %s${%s})", target.name, keyword, variable))
@@ -73,6 +86,10 @@ local function render(spec)
       put(string.format("add_executable(%s ${%s})", target.name, variable))
       put_runtime_directory(target)
     end
+  end
+
+  local function put_target(target, index)
+    put_declaration(target, variable_for(index))
 
     local linked = {}
     for index_of_link = 1, #target.links do linked[#linked + 1] = target.links[index_of_link] end
@@ -100,19 +117,14 @@ local function render(spec)
     end
     if #include_groups > 0 then put(")") end
 
-    local define_groups = visibility_groups(target.defines, target.publicDefines,
-                                            target.interfaceDefines)
-    if #define_groups > 0 then
-      local words = {}
-      for _, group in ipairs(define_groups) do
-        local quoted = {}
-        for index_of_define, define in ipairs(group.items) do
-          quoted[index_of_define] = string.format('"%s"', define)
-        end
-        words[#words + 1] = group.keyword .. " " .. table.concat(quoted, " ")
-      end
-      put(string.format("target_compile_definitions(%s %s)", target.name, table.concat(words, " ")))
-    end
+    put_quoted_groups("target_compile_definitions", target.name,
+                      visibility_groups(target.defines, target.publicDefines, target.interfaceDefines))
+    put_quoted_groups("target_compile_options", target.name,
+                      visibility_groups(target.compileOptions, target.publicCompileOptions,
+                                        target.interfaceCompileOptions))
+    put_quoted_groups("target_link_options", target.name,
+                      visibility_groups(target.linkOptions, target.publicLinkOptions,
+                                        target.interfaceLinkOptions))
 
     if target.standard ~= nil then
       put(string.format('set_target_properties(%s PROPERTIES %s "%s" %s_REQUIRED ON)',

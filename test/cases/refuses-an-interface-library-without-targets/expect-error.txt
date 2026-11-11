@@ -1,0 +1,1 @@
+an "interface" library is described by its "interfaceIncludes", "interfaceDefines" and "interfaceLinks", which are target keys: declare it in "targets"

@@ -62,9 +62,10 @@ version = "4.4"
   links   = ["greet"]
 ```
 
-A target owns `name`, `kind`, `sources`, `includes`, `defines`, `standard`, `links` and
-`systemLinks`, and a library also `publicIncludes`, `publicDefines`, `publicLinks`,
-`interfaceIncludes`, `interfaceDefines` and `interfaceLinks`; everything else stays project wide.
+A target owns `name`, `kind`, `sources`, `includes`, `defines`, `standard`, `links`,
+`systemLinks`, `compileOptions` and `linkOptions`, and a library also `libraryType` and the
+`public*` and `interface*` forms of `includes`, `defines`, `links`, `compileOptions` and
+`linkOptions`; everything else stays project wide.
 **A project-wide `sources` beside `targets` is refused** rather than silently applying to none of them.
 
 **`includes`, `defines` and `links` are `PRIVATE`: they build the target and reach nothing that
@@ -74,12 +75,27 @@ links it.** The `public*` keys are CMake's `PUBLIC` (the target and everything l
 executable, which nothing links, and on the one-target shape, which has nothing to link it.
 `publicLinks` and `interfaceLinks` take the same names, and get the same check, as `links`.
 
+**`compileOptions` and `linkOptions` are flags for the compiler and the linker**, rendered quoted
+under `target_compile_options` and `target_link_options`, with `public*` and `interface*` forms that
+follow the same rules as the other usage requirements; the private two also work on the one-target
+shape. CMake drops a repeated option, so a flag with a separate argument is written as one
+`SHELL:` entry, such as `"SHELL:-include config.h"`. A flag is passed as written, so one that only
+some compilers know is the project's choice to make.
+
 **A library's `libraryType` is `static`, `shared`, `module` or `object`**, rendered as that
 `add_library` keyword; without it no keyword is written and `BUILD_SHARED_LIBS` decides. A shared or
 module library is placed beside the executables, because on Windows its DLL is a runtime output the
 loader looks for there. Linking a `module` library is refused, since CMake loads one at run time and
 cannot link it. On Windows a shared library exports nothing unless its code says so, so a project
 without `__declspec(dllexport)` passes `-DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=ON` in `configureArgs`.
+
+**An `interface` library is a header-only one: it compiles nothing and is described only by what
+reaches its consumers.** It renders as `add_library(<name> INTERFACE)` and takes `interfaceIncludes`,
+`interfaceDefines` and `interfaceLinks`; `sources`, `standard`, `systemLinks` and the private and
+`public*` keys are refused, since CMake refuses them on a target it does not build. It has no
+`cmake:<name>` task, because CMake gives it no build target, and it is refused on the one-target
+shape, which has no `interface*` keys. A target that links it gets its includes, its definitions and
+its own links.
 
 **`links` names another declared target or a package the resolver fetches, and anything else is
 refused where the manifest is read.** CMake reports an unknown link as a missing library at LINK
