@@ -1,0 +1,1 @@
+"tests[1].workingDirectory" may not climb out of the project, and "../elsewhere" does

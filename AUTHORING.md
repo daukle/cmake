@@ -362,7 +362,10 @@ target = "checks"
 args   = ["--fast"]
 ```
 
-A test's `name` holds letters, digits, `.`, `_` and `-`, and two tests may not share one. A target
+A test's `name` holds letters, digits, `.`, `_` and `-`, and two tests may not share one. A test
+may also set `workingDirectory` (a directory in the project; ctest's default is the build
+directory), `labels` (words that `testArgs = ["-L", "fast"]` selects by), `timeout` (whole
+seconds) and `willFail` (the test passes when the program fails). A target
 called `test` already owns the task `cmake:test`, so a project with one keeps it and gets no test
 task, and declaring `tests` beside it is refused until the target is renamed.
 

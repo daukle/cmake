@@ -1,0 +1,32 @@
+schema = 1
+project = "example/app"
+version = "1.0.0"
+
+[modules]
+
+[plugins]
+cmake = "./plugins/cmake"
+
+[toolchains.cmake]
+version = "4.4"
+testArgs = ["-L", "fast"]
+
+  [[toolchains.cmake.tests]]
+  name             = "reads-its-data"
+  target           = "app"
+  workingDirectory = "data"
+  labels           = ["fast"]
+  timeout          = 60
+
+  [[toolchains.cmake.tests]]
+  name     = "fails-as-expected"
+  target   = "app"
+  args     = ["missing.txt"]
+  labels   = ["fast"]
+  willFail = true
+
+  [[toolchains.cmake.tests]]
+  name   = "excluded-by-label"
+  target = "app"
+  args   = ["missing.txt"]
+  labels = ["slow"]

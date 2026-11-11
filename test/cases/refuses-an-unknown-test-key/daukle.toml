@@ -13,4 +13,4 @@ version = "4.4"
   [[toolchains.cmake.tests]]
   name    = "unit"
   target  = "app"
-  timeout = 5
+  retries = 5
