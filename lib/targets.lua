@@ -11,6 +11,7 @@ local KNOWN_KEYS = {
   defines = true, standard = true, buildType = true, generator = true,
   configureArgs = true, buildArgs = true, runArgs = true, dependencies = true,
   compiler = true, targets = true, default = true, systemLinks = true, libraryType = true,
+  compileOptions = true, linkOptions = true,
 }
 
 --- A library target's `libraryType`, as the `add_library` keyword it renders. Without one the
@@ -28,9 +29,11 @@ local REPLACEMENT_ON_AN_INTERFACE_LIBRARY = {
   includes = "interfaceIncludes", publicIncludes = "interfaceIncludes",
   defines = "interfaceDefines", publicDefines = "interfaceDefines",
   links = "interfaceLinks", publicLinks = "interfaceLinks",
+  compileOptions = "interfaceCompileOptions", publicCompileOptions = "interfaceCompileOptions",
+  linkOptions = "interfaceLinkOptions", publicLinkOptions = "interfaceLinkOptions",
 }
 
---[[ The five keys a TARGET owns. A project-wide key is not one of these: a
+--[[ The keys a TARGET owns. A project-wide key is not one of these: a
      generator or a build type is a property of the build, not of a thing the
      build produces, and letting a target carry one would mean two targets
      could ask for different generators. ]]
@@ -39,6 +42,8 @@ local TARGET_KEYS = {
   standard = true, links = true, systemLinks = true, libraryType = true,
   publicIncludes = true, interfaceIncludes = true, publicDefines = true, interfaceDefines = true,
   publicLinks = true, interfaceLinks = true,
+  compileOptions = true, publicCompileOptions = true, interfaceCompileOptions = true,
+  linkOptions = true, publicLinkOptions = true, interfaceLinkOptions = true,
 }
 
 --- The keys whose values reach a target's consumers, CMake's `PUBLIC` and `INTERFACE` usage
@@ -47,6 +52,13 @@ local PRIVATE_KEY_OF = {
   publicIncludes = "includes", interfaceIncludes = "includes",
   publicDefines = "defines", interfaceDefines = "defines",
   publicLinks = "links", interfaceLinks = "links",
+  publicCompileOptions = "compileOptions", interfaceCompileOptions = "compileOptions",
+  publicLinkOptions = "linkOptions", interfaceLinkOptions = "linkOptions",
+}
+
+local OPTION_KEYS = {
+  "compileOptions", "publicCompileOptions", "interfaceCompileOptions",
+  "linkOptions", "publicLinkOptions", "interfaceLinkOptions",
 }
 
 -- A target becomes a task, and core refuses a task name that is not lowercase
@@ -231,6 +243,9 @@ local function targets_of(config, language, project_target, package_names)
       links = package_names,
       systemLinks = values.system_library_list(config.systemLinks, "systemLinks") or {},
       publicLinks = {}, interfaceLinks = {},
+      compileOptions = values.cmake_text_list(config.compileOptions, "compileOptions", "options",
+                                              "option"),
+      linkOptions = values.cmake_text_list(config.linkOptions, "linkOptions", "options", "option"),
     }
     refuse_a_known_name_as_a_system_library(only, "systemLinks", { [project_target] = true },
                                             package_names)
@@ -312,6 +327,9 @@ local function targets_of(config, language, project_target, package_names)
       interfaceLinks = values.cmake_text_list(entry.interfaceLinks, at .. ".interfaceLinks",
                                               "target names", "target name") or {},
     }
+    for _, key in ipairs(OPTION_KEYS) do
+      out[index][key] = values.cmake_text_list(entry[key], at .. "." .. key, "options", "option")
+    end
   end
 
   local keyword_of = {}

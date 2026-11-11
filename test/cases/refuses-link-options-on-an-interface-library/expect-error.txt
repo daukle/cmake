@@ -1,0 +1,1 @@
+targets[1] is an "interface" library and declares "linkOptions", which only a library that is built can use: write it as "interfaceLinkOptions"
