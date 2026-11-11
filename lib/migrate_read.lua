@@ -22,11 +22,10 @@ local function read_dir_from_project(context)
   return climb_of(context.dir) .. derived_of(context) .. "/" .. READ_DIR
 end
 
---- The project root's absolute path, from the source directory CMake reported for the instance.
-local function project_root_of(context, reply)
-  local climb = climb_of(context.dir)
-  if climb == "" then return reply.source_root end
-  return reply.source_root .. "/" .. climb
+--- The directory every path of the translation is relative to: the instance's own, which CMake
+--- reports as the source directory and `daukle/cmake` resolves an instance's paths against.
+local function instance_root_of(reply)
+  return reply.source_root
 end
 
 --- Configures the project's own CMake files once, with a file API query, and writes the old side
@@ -40,7 +39,7 @@ local function read(context, provision_cmake)
               { cwd = context.dir or "." })
   local build_dir = derived_of(context) .. "/" .. READ_DIR
   local reply = file_api.read_reply(build_dir, BUILD_TYPE)
-  local root = project_root_of(context, reply)
+  local root = instance_root_of(reply)
   daukle.write{ path = READ_DIR .. "/" .. plan.FILE, text = plan.text(reply, root) }
   return reply, root, build_dir
 end

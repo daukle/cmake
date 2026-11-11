@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.20)
+project(frozen LANGUAGES C)
+option(WITH_EXTRA "build the extra define" ON)
+add_executable(app main.c)
+if(WITH_EXTRA)
+  target_compile_definitions(app PRIVATE EXTRA=1)
+endif()
+install(TARGETS app)

@@ -307,7 +307,7 @@ daukle.task{
     local spec = manifest.read(context)
     file_api.write_query(BUILD_DIR)
     configure(context, spec)
-    local derived = "build/daukle/" .. (context.instance or "cmake")
+    local derived = "build/daukle/" .. (context.instance or context.toolchain.name)
     local reply = file_api.read_reply(derived .. "/" .. BUILD_DIR, spec.buildType)
     daukle.write{ path = plan.FILE, text = plan.text(reply, reply.source_root .. "/" .. context.root) }
   end,

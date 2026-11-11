@@ -35,22 +35,24 @@ local function configuration_of(codemodel, wanted)
 end
 
 local function cache_of(reply_dir, file)
+  local entries = read_json(reply_dir, file).entries
   local values = {}
-  for _, entry in ipairs(read_json(reply_dir, file).entries) do values[entry.name] = entry.value end
-  return values
+  for _, entry in ipairs(entries) do values[entry.name] = entry.value end
+  return values, entries
 end
 
 --- The model a configure of `build_dir` left, for one configuration.
 --- @param build_dir relative to the project root, where `daukle.read` and `daukle.list` look
 --- @return { targets = { [name] = target }, abstract = { [name] = target }, cache = { [name] = value },
----           source_root = string }
+---           cache_entries = list, directories = list, source_root = string }
 local function read_reply(build_dir, configuration_name)
   local reply_dir = build_dir .. "/.cmake/api/v1/reply"
   local index = read_json(reply_dir, latest_index(reply_dir))
   local codemodel = read_json(reply_dir, index.reply["codemodel-v2"].jsonFile)
   local configuration = configuration_of(codemodel, configuration_name)
-  local reply = { targets = {}, abstract = {}, source_root = codemodel.paths.source,
-                  cache = cache_of(reply_dir, index.reply["cache-v2"].jsonFile) }
+  local cache, cache_entries = cache_of(reply_dir, index.reply["cache-v2"].jsonFile)
+  local reply = { targets = {}, abstract = {}, source_root = codemodel.paths.source, cache = cache,
+                  cache_entries = cache_entries, directories = configuration.directories or {} }
   for _, entry in ipairs(configuration.targets) do
     reply.targets[entry.name] = read_json(reply_dir, entry.jsonFile)
   end
