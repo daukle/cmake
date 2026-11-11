@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.20)
+project(tally VERSION 2.0.0 LANGUAGES C)
+add_subdirectory(lib)
+add_executable(app app/main.c)
+set_target_properties(app PROPERTIES OUTPUT_NAME tally)
+target_compile_definitions(app PRIVATE APP_MODE=2)
+target_link_libraries(app PRIVATE core)

@@ -1,0 +1,5 @@
+add_compile_definitions(FROM_DIR=1)
+add_subdirectory(base)
+if(WITH_TOOLS)
+  add_subdirectory(tools)
+endif()

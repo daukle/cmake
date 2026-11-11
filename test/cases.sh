@@ -42,9 +42,212 @@ stage_plugin() {
   fi
 }
 
+MANIFEST_CHECK='
+import sys
+sections, current = [], []
+for line in open(sys.argv[1], encoding="utf-8").read().splitlines():
+    if line.startswith("["):
+        sections.append(current)
+        current = []
+    current.append(line)
+sections.append(current)
+paragraphs = [[]]
+for line in open(sys.argv[2], encoding="utf-8").read().splitlines():
+    if line.strip():
+        paragraphs[-1].append(line)
+    elif paragraphs[-1]:
+        paragraphs.append([])
+paragraphs = [paragraph for paragraph in paragraphs if paragraph]
+for paragraph in paragraphs:
+    wanted = [line for line in paragraph if not line.startswith("!")]
+    refused = [line[1:] for line in paragraph if line.startswith("!")]
+    carrying = [section for section in sections if all(line in section for line in wanted)]
+    if (wanted and not carrying) or any(line.startswith(prefix) for section in carrying for line in section for prefix in refused):
+        print(" / ".join(paragraph))
+        sys.exit(1)
+'
+
+outputs_carry_clauses() {
+  clauses=$1
+  shift
+  if [ -f "$case_dir/$clauses" ]; then
+    if ! grep -q . "$case_dir/$clauses"; then
+      fail "$name" "$clauses is empty, so this case asserts nothing"
+      return 1
+    fi
+    while IFS= read -r clause || [ -n "$clause" ]; do
+      [ -n "$clause" ] || continue
+      if ! grep -qF "$clause" "$@"; then
+        fail "$name" "output does not carry: $clause"
+        return 1
+      fi
+    done < "$case_dir/$clauses"
+  fi
+  return 0
+}
+
+manifest_carries_clauses() {
+  [ -f "$case_dir/expect-manifest.txt" ] || return 0
+  if ! grep -q . "$case_dir/expect-manifest.txt"; then
+    fail "$name" "expect-manifest.txt is empty, so this case asserts nothing"
+    return 1
+  fi
+  if [ ! -f "$sandbox/daukle.toml" ]; then
+    fail "$name" "expected daukle.toml, which the migration did not write"
+    return 1
+  fi
+  python=$(working_python) || { fail "$name" "no python3 or python that runs"; return 1; }
+  if ! missing=$("$python" -c "$MANIFEST_CHECK" "$sandbox/daukle.toml" "$case_dir/expect-manifest.txt"); then
+    fail "$name" "daukle.toml does not match, in one table: $missing"
+    return 1
+  fi
+  return 0
+}
+
+working_python() {
+  for candidate in python3 python; do
+    command -v "$candidate" >/dev/null 2>&1 || continue
+    "$candidate" -c 'import sys' >/dev/null 2>&1 && { echo "$candidate"; return 0; }
+  done
+  return 1
+}
+
+PLUGIN_SERVER='
+import functools, http.server, os, sys
+handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=sys.argv[1])
+server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+with open(sys.argv[2] + ".tmp", "w") as out:
+    out.write(str(server.server_port))
+os.replace(sys.argv[2] + ".tmp", sys.argv[2])
+server.serve_forever()
+'
+
+# daukle migrate finds a plugin only through a catalog, whose asset is pinned
+# by url and sha256 and taken over https or loopback http alone. So the plugin
+# is packed exactly as publish.yml packs it and served from 127.0.0.1, once per
+# run. Copied from daukle/node's harness, which measured both constraints.
+serve_plugin() {
+  [ -n "${catalog:-}" ] && return 0
+  python=$(working_python) || { fail "$name" "no python3 or python that runs"; return 1; }
+  asset_dir="$work/asset"
+  mkdir -p "$asset_dir"
+  # COPYFILE_DISABLE and ustar keep macOS bsdtar from adding AppleDouble or pax
+  # members, and core's tar reader takes only regular files and directories.
+  packed="$work/plugin.tar"
+  (cd "$root" && COPYFILE_DISABLE=1 tar --format=ustar -cf "$packed" plugin.lua lib/*.lua)
+  digest=$(sha256sum "$packed" 2>/dev/null | cut -d' ' -f1)
+  [ -n "$digest" ] || digest=$(shasum -a 256 "$packed" | cut -d' ' -f1)
+  # Served under its own digest because core caches a plugin by its url, and a
+  # port an earlier run used would hand back that run's lib/.
+  mkdir -p "$asset_dir/$digest"
+  mv "$packed" "$asset_dir/$digest/plugin.lua"
+  port_file="$work/server-port"
+  rm -f "$port_file"
+  "$python" -c "$PLUGIN_SERVER" "$asset_dir" "$port_file" >"$work/server.log" 2>&1 &
+  server=$!
+  trap 'kill "$server" 2>/dev/null || true' EXIT
+  port=
+  for _ in $(seq 60); do
+    [ -s "$port_file" ] && port=$(cat "$port_file") &&
+      curl -fsS "http://127.0.0.1:$port/$digest/plugin.lua" -o /dev/null 2>/dev/null && break
+    port=
+    kill -0 "$server" 2>/dev/null || break
+    sleep 1
+  done
+  if [ -z "$port" ]; then
+    fail "$name" "the plugin server did not start, so no migrate case can run: $(cat "$work/server.log")"
+    return 1
+  fi
+  catalog="$work/catalog.json"
+  "$python" -c 'import json,sys; c=json.load(open(sys.argv[1])); c.update(id="cmake", asset={"url":sys.argv[2],"sha256":sys.argv[3]}); json.dump({"plugins":[c]}, open(sys.argv[4],"w"))' \
+    "$root/catalog.json" "http://127.0.0.1:$port/$digest/plugin.lua" "$digest" "$catalog"
+}
+
+# One path per line in expect-file.txt that must exist after the run, and in
+# expect-absent.txt that must not: what a migration moved aside and what it
+# kept is asserted on the tree itself, never on the message that reports it.
+tree_has_paths() {
+  for list in expect-file.txt expect-absent.txt; do
+    [ -f "$case_dir/$list" ] || continue
+    if ! grep -q . "$case_dir/$list"; then
+      fail "$name" "$list is empty, so this case asserts nothing"
+      return 1
+    fi
+    while IFS= read -r wanted || [ -n "$wanted" ]; do
+      [ -n "$wanted" ] || continue
+      if [ "$list" = expect-file.txt ] && [ ! -e "$sandbox/$wanted" ]; then
+        fail "$name" "expected $wanted, which the run did not leave"
+        return 1
+      fi
+      if [ "$list" = expect-absent.txt ] && [ -e "$sandbox/$wanted" ]; then
+        fail "$name" "$wanted is still there"
+        return 1
+      fi
+    done < "$case_dir/$list"
+  done
+  return 0
+}
+
+# A migrate case asserts its exit code (expect-exit.txt), then what the output
+# and the files it names carry and lack, with the same expect-output.txt,
+# expect-contains.txt, expect-blocks.txt and expect-lacks.txt every other case
+# uses, then expect-manifest.txt, then the paths it expects present and absent.
+# A case with after-migrate then runs each daukle command it lists, in order,
+# each of which must succeed, and their output must carry
+# expect-after-output.txt: what proves a build still works once the migration
+# moved the old files aside, which the migration's own proof ran before.
+run_after_migrate() {
+  [ -f "$case_dir/after-migrate" ] || return 0
+  while IFS= read -r command || [ -n "$command" ]; do
+    [ -n "$command" ] || continue
+    if ! (cd "$sandbox" && "$daukle" $command >>after-stdout.txt 2>>after-stderr.txt </dev/null); then
+      fail "$name" "after the migration, daukle $command failed"
+      tail -n 30 "$sandbox/after-stderr.txt" >&2
+      return 1
+    fi
+  done < "$case_dir/after-migrate"
+  outputs_carry_clauses expect-after-output.txt "$sandbox/after-stdout.txt" "$sandbox/after-stderr.txt"
+}
+
+run_migrate_case() {
+  serve_plugin || return 0
+  status=0
+  (cd "$sandbox" && "$daukle" migrate --catalog "$catalog" >stdout.txt 2>stderr.txt) || status=$?
+  wanted=$(cat "$case_dir/expect-exit.txt")
+  if [ "$status" -ne "$wanted" ]; then
+    fail "$name" "migrate exited $status, wanted $wanted"
+    echo "--- stdout" >&2
+    tail -n 30 "$sandbox/stdout.txt" >&2
+    echo "--- stderr" >&2
+    tail -n 30 "$sandbox/stderr.txt" >&2
+    return 0
+  fi
+  outputs_carry_clauses expect-output.txt "$sandbox/stdout.txt" "$sandbox/stderr.txt" || return 0
+  manifest_carries_clauses || return 0
+  tree_has_paths || return 0
+  run_after_migrate || return 0
+  passed=$((passed + 1))
+}
+
+
 run_case() {
   case_dir=$1
   name=$(basename "$case_dir")
+
+  if [ -f "$case_dir/migrate" ]; then
+    if [ "$(uname -s)" != "Linux" ] && [ "${DAUKLE_CMAKE_E2E:-}" != "1" ]; then
+      echo "skip $name: set DAUKLE_CMAKE_E2E=1 to run it here" >&2
+      skipped=$((skipped + 1))
+      return
+    fi
+    sandbox="$work/$name"
+    rm -rf "$sandbox"
+    mkdir -p "$(dirname "$sandbox")"
+    cp -R "$case_dir" "$sandbox"
+    rm -f "$sandbox/migrate" "$sandbox/expect-exit.txt" "$sandbox/expect-manifest.txt"           "$sandbox/expect-output.txt" "$sandbox/expect-file.txt" "$sandbox/expect-absent.txt"           "$sandbox/after-migrate" "$sandbox/expect-after-output.txt"
+    run_migrate_case
+    return
+  fi
 
   # daukle.lua is included because core accepts one as the PRIMARY manifest
   # when no daukle.toml sits beside it, and a chunk that parses the manifest
