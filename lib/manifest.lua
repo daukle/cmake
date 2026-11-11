@@ -1,6 +1,7 @@
 local values = daukle.require("lib/values")
 local targets = daukle.require("lib/targets")
 local tests = daukle.require("lib/tests")
+local find_packages = daukle.require("lib/find_packages")
 
 local LANGUAGES = { c = "C", ["c++"] = "CXX" }
 local STANDARD_PROPERTY = { c = "C_STANDARD", ["c++"] = "CXX_STANDARD" }
@@ -104,8 +105,12 @@ local function read(context)
   end
 
   local dependencies = dependencies_of(context)
+  local found = find_packages.find_packages_of(config)
   local package_names = {}
   for index = 1, #dependencies do package_names[index] = dependencies[index].package end
+  for _, name in ipairs(find_packages.imported_targets_of(found)) do
+    package_names[#package_names + 1] = name
+  end
 
   local project_target = targets.target_of(context.project)
   local project_targets = targets.targets_of(config, language, project_target, package_names)
@@ -169,6 +174,7 @@ local function read(context)
     tests = tests.tests_of(config, project_targets),
     testArgs = values.string_list(config.testArgs, "testArgs", "arguments", "argument"),
     dependencies = dependencies,
+    findPackages = found,
     root = context.root,
   }
 end

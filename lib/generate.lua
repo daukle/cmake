@@ -168,6 +168,19 @@ local function render(spec)
     put("")
   end
 
+  if #spec.findPackages > 0 then
+    for _, package in ipairs(spec.findPackages) do
+      local words = { package.name }
+      if package.version ~= nil then words[#words + 1] = package.version end
+      words[#words + 1] = "REQUIRED"
+      if #package.components > 0 then
+        words[#words + 1] = "COMPONENTS " .. table.concat(package.components, " ")
+      end
+      put(string.format("find_package(%s)", table.concat(words, " ")))
+    end
+    put("")
+  end
+
   for index = 1, #spec.targets do
     if index > 1 then put("") end
     put_target(spec.targets[index], index)

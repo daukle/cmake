@@ -35,6 +35,7 @@ local KNOWN_KEYS = {
   buildType = true, generator = true, configureArgs = true, buildArgs = true, runArgs = true,
   dependencies = true, compiler = true, targets = true, default = true, systemLinks = true,
   libraryType = true, extensions = true, outputName = true, tests = true, testArgs = true,
+  findPackages = true,
 }
 
 --- A library target's `libraryType`, as the `add_library` keyword it renders. Without one the
@@ -144,8 +145,9 @@ local function refuse_an_unknown_link(target, index, declared, package_names)
       local link = target[key][link_index]
       if not declared[link] and not package_names_hold(package_names, link) then
         error(string.format('targets[%d].%s names "%s", which is neither another target this'
-                            .. ' manifest declares nor a package it fetches. A library the host'
-                            .. ' provides, such as "m" or "pthread", goes in "systemLinks"',
+                            .. ' manifest declares nor a package it fetches, nor an imported target'
+                            .. ' a "findPackages" entry names. A library the host provides, such as'
+                            .. ' "m" or "pthread", goes in "systemLinks"',
                             index, key, link), 0)
       end
     end
