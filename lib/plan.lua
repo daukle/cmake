@@ -127,4 +127,10 @@ local function text(reply, project_root)
   return table.concat(blocks, "\n\n") .. "\n"
 end
 
-return { FILE = FILE, text = text, normalised = normalised }
+--- A path the reply gives, relative to the project, or nil when it lies outside it.
+local function project_relative(path, base, project_root)
+  return below(absolute(path, base), normalised(project_root))
+end
+
+return { FILE = FILE, text = text, normalised = normalised, project_relative = project_relative,
+         name_of_id = name_of_id, is_project_interface = is_project_interface, is_listed = is_listed }

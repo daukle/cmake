@@ -28,6 +28,7 @@ local drivers = daukle.require("lib/drivers")
 local generate = daukle.require("lib/generate")
 local file_api = daukle.require("lib/file_api")
 local plan = daukle.require("lib/plan")
+local migrator = daukle.require("lib/migrator")
 
 daukle.toolchain{
   name = "cmake",
@@ -61,6 +62,14 @@ end
 local function provision_cmake(context, spec)
   return provision_cmake_program(context, spec, "cmake")
 end
+
+daukle.migrator{
+  tool = "cmake",
+  toolchain = "cmake",
+  run = migrator.run_with(function(context, version)
+    return provision_cmake_program(context, { version = version }, "cmake")
+  end),
+}
 
 local function append(argv, extra)
   if extra == nil then return argv end
