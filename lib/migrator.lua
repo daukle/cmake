@@ -1,6 +1,8 @@
 local migrate_read = daukle.require("lib/migrate_read")
 local migrate_translate = daukle.require("lib/migrate_translate")
 local plan = daukle.require("lib/plan")
+local migrate_blockers = daukle.require("lib/migrate_blockers")
+local migrate_notes = daukle.require("lib/migrate_notes")
 
 local ROOT_FILE = "CMakeLists.txt"
 
@@ -21,7 +23,8 @@ local function run_with(provision_cmake)
       manifest = { project = translated.project, version = translated.version,
                    toolchains = { [context.instance] = translated.config } },
       foreign = {},
-      blockers = {},
+      blockers = migrate_blockers.of(reply, root, translated),
+      notes = migrate_notes.of(reply, root, translated),
       owned = {},
       proof = { task = context.instance .. ":plan",
                 compare = { { old = derived .. "/" .. migrate_read.READ_DIR .. "/" .. plan.FILE,

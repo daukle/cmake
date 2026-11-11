@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.20)
+project(fetching LANGUAGES C)
+include(FetchContent)
+FetchContent_Declare(dep URL ${CMAKE_CURRENT_SOURCE_DIR}/third_party/dep)
+FetchContent_MakeAvailable(dep)
+add_executable(app main.c)
+target_link_libraries(app PRIVATE dep)

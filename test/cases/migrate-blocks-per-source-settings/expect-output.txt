@@ -1,0 +1,1 @@
+compiles its sources with different settings

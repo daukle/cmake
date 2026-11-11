@@ -1,6 +1,6 @@
 {
   "detect": [
-    { "files": ["CMakeLists.txt"], "scope": "root" }
+    { "files": ["CMakeLists.txt"], "scope": "tree" }
   ],
   "replaces": {},
   "skip": ["build"]

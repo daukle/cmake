@@ -1,0 +1,2 @@
+frozen WITH_EXTRA=ON
+not migrated: install rules in CMakeLists.txt
