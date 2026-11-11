@@ -57,6 +57,19 @@ local function render(spec)
     return "DAUKLE_SOURCES_" .. index
   end
 
+  local function put_test_properties(test)
+    local properties = {}
+    if #test.labels > 0 then
+      properties[#properties + 1] = string.format('LABELS "%s"', table.concat(test.labels, ";"))
+    end
+    if test.timeout ~= nil then properties[#properties + 1] = "TIMEOUT " .. test.timeout end
+    if test.willFail then properties[#properties + 1] = "WILL_FAIL ON" end
+    if #properties > 0 then
+      put(string.format("set_tests_properties(%s PROPERTIES %s)", test.name,
+                        table.concat(properties, " ")))
+    end
+  end
+
   local function put_include_groups(target_name, system, groups)
     for group_index, group in ipairs(groups) do
       if group_index == 1 then
@@ -192,7 +205,11 @@ local function render(spec)
     for _, test in ipairs(spec.tests) do
       local words = { "NAME", test.name, "COMMAND", test.target }
       for _, argument in ipairs(test.args) do words[#words + 1] = string.format('"%s"', argument) end
+      if test.workingDirectory ~= nil then
+        words[#words + 1] = "WORKING_DIRECTORY " .. source_path(test.workingDirectory)
+      end
       put(string.format("add_test(%s)", table.concat(words, " ")))
+      put_test_properties(test)
     end
   end
 

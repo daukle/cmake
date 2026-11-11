@@ -1,1 +1,1 @@
-"timeout" is not a key a test knows, in tests[1]
+"retries" is not a key a test knows, in tests[1]
