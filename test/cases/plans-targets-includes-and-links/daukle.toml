@@ -1,0 +1,34 @@
+schema = 1
+project = "example/app"
+version = "1.0.0"
+
+[modules]
+
+[plugins]
+cmake = "./plugins/cmake"
+
+[toolchains.cmake]
+version = "4.4"
+
+  [[toolchains.cmake.findPackages]]
+  name    = "Threads"
+  targets = ["Threads::Threads"]
+
+  [[toolchains.cmake.targets]]
+  name           = "core"
+  kind           = "library"
+  libraryType    = "static"
+  sources        = ["src/core/*.c"]
+  publicIncludes = ["include"]
+  defines        = ["CORE_PRIV=1"]
+
+  [[toolchains.cmake.targets]]
+  name             = "hdr"
+  kind             = "library"
+  libraryType      = "interface"
+  interfaceDefines = ["HDR_ON=1"]
+
+  [[toolchains.cmake.targets]]
+  name    = "app"
+  sources = ["src/app/*.c"]
+  links   = ["core", "hdr", "Threads::Threads"]

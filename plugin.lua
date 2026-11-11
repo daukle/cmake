@@ -1,6 +1,6 @@
 daukle.plugin{
   api = 1,
-  uses = { "provision", "exec", "built", "read", "parse" },
+  uses = { "provision", "exec", "built", "read", "parse", "write", "list", "json_parse" },
   requires = {
     lifecycle = {
       url = "https://github.com/daukle/lifecycle/releases/download/1.0.0/plugin.lua",
@@ -26,6 +26,8 @@ local manifest = daukle.require("lib/manifest")
 local cmakes = daukle.require("lib/cmakes")
 local drivers = daukle.require("lib/drivers")
 local generate = daukle.require("lib/generate")
+local file_api = daukle.require("lib/file_api")
+local plan = daukle.require("lib/plan")
 
 daukle.toolchain{
   name = "cmake",
@@ -152,14 +154,19 @@ local function refuse_an_unrunnable_project(spec)
         .. table.concat(tasks, ", "), 0)
 end
 
+local BUILD_DIR = "_b"
+
+local function configure(context, spec)
+  local cmake = provision_cmake(context, spec)
+  local argv = { "-S", ".", "-B", BUILD_DIR, "-DCMAKE_BUILD_TYPE=" .. spec.buildType }
+  append_toolchain(argv, context, spec)
+  daukle.exec(cmake, append(argv, spec.configureArgs))
+end
+
 daukle.task{
   name = "cmake:configure",
   run = function(context)
-    local spec = manifest.read(context)
-    local cmake = provision_cmake(context, spec)
-    local argv = { "-S", ".", "-B", "_b", "-DCMAKE_BUILD_TYPE=" .. spec.buildType }
-    append_toolchain(argv, context, spec)
-    daukle.exec(cmake, append(argv, spec.configureArgs))
+    configure(context, manifest.read(context))
   end,
 }
 
@@ -280,3 +287,19 @@ if not a_target_owns_the_test_task then
     end,
   }))
 end
+
+--[[ Describes the build as CMake evaluated it, in the canonical text a migration's proof compares
+     with the text the old build's read wrote: the configure runs again with a file API query so
+     the reply describes exactly what cmake:build just built. ]]
+daukle.task{
+  name = "cmake:plan",
+  dependsOn = { names.qualify("cmake", names.BUILD) },
+  run = function(context)
+    local spec = manifest.read(context)
+    file_api.write_query(BUILD_DIR)
+    configure(context, spec)
+    local derived = "build/daukle/" .. (context.instance or "cmake")
+    local reply = file_api.read_reply(derived .. "/" .. BUILD_DIR, spec.buildType)
+    daukle.write{ path = plan.FILE, text = plan.text(reply, reply.source_root .. "/" .. context.root) }
+  end,
+}
