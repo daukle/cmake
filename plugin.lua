@@ -43,7 +43,8 @@ daukle.toolchain{
   end,
 }
 
-local function provision_cmake(context, spec)
+--- One of the programs a CMake release ships beside `cmake` in its `bin`, such as `ctest`.
+local function provision_cmake_program(context, spec, program)
   local pick = cmakes.assert_host{ os = context.host.os, arch = context.host.arch,
                                    version = spec.version }
   local root = daukle.provision{
@@ -52,7 +53,11 @@ local function provision_cmake(context, spec)
     as = "cmake " .. pick.full,
   }
   local suffix = context.host.os == "windows" and ".exe" or ""
-  return root:tool(pick.home .. "/bin/cmake" .. suffix)
+  return root:tool(pick.home .. "/bin/" .. program .. suffix)
+end
+
+local function provision_cmake(context, spec)
+  return provision_cmake_program(context, spec, "cmake")
 end
 
 local function append(argv, extra)
@@ -178,8 +183,15 @@ daukle.task(names.assert_contract(names.BUILD, {
      relative path. ]]
 local PROGRAM_CWD = "build/daukle/cmake/_b"
 
+local function file_name_of(spec, target_name)
+  for _, target in ipairs(spec.targets) do
+    if target.name == target_name then return target.outputName or target_name end
+  end
+  return target_name
+end
+
 local function run_program(context, spec, target_name)
-  local program = "_b/" .. generate.RUNTIME_DIRECTORY .. "/" .. target_name
+  local program = "_b/" .. generate.RUNTIME_DIRECTORY .. "/" .. file_name_of(spec, target_name)
                   .. executable_suffix(context)
   local result = daukle.exec(daukle.built(program), spec.runArgs or {},
                              { cwd = PROGRAM_CWD, check = false })
@@ -225,7 +237,12 @@ local function declarative_manifest()
 end
 
 local document = declarative_manifest()
-for _, target in ipairs(document ~= nil and manifest.task_targets(document) or {}) do
+local target_tasks = document ~= nil and manifest.task_targets(document) or {}
+local a_target_owns_the_test_task = false
+for _, target in ipairs(target_tasks) do
+  if target.task == manifest.TEST_TASK then a_target_owns_the_test_task = true end
+end
+for _, target in ipairs(target_tasks) do
   -- The CMake target keeps the user's case; only the task name is lowercased,
   -- so "--target" takes the original and the two are not interchangeable.
   daukle.task{
@@ -242,4 +259,24 @@ for _, target in ipairs(document ~= nil and manifest.task_targets(document) or {
       end,
     }
   end
+end
+
+--[[ Runs every declared test through the ctest of the pinned CMake, against the build directory
+     cmake:build filled, with testArgs after its own flags so -R, -L or -j narrow or widen it.
+     @implNote not registered when a target is called "test", which already owns this task name:
+     a project with such a target predates the tests key, and taking the name would break it. ]]
+if not a_target_owns_the_test_task then
+  daukle.task(names.assert_contract(names.TEST, {
+    name = names.qualify("cmake", names.TEST),
+    dependsOn = { names.qualify("cmake", names.BUILD) },
+    run = function(context)
+      local spec = manifest.read(context)
+      if #spec.tests == 0 then
+        error('this project declares no "tests", so there is nothing for cmake:test to run', 0)
+      end
+      local ctest = provision_cmake_program(context, spec, "ctest")
+      daukle.exec(ctest, append({ "--test-dir", "_b", "-C", spec.buildType, "--output-on-failure" },
+                                spec.testArgs))
+    end,
+  }))
 end

@@ -1,0 +1,1 @@
+tests[1] runs "greet", which is not an executable target this manifest declares

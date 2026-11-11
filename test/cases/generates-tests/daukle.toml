@@ -1,0 +1,29 @@
+schema = 1
+project = "example/app"
+version = "1.0.0"
+
+[modules]
+
+[plugins]
+cmake = "./plugins/cmake"
+
+[toolchains.cmake]
+version = "4.4"
+default = "app"
+
+  [[toolchains.cmake.targets]]
+  name    = "app"
+  sources = ["src/app/*.c"]
+
+  [[toolchains.cmake.targets]]
+  name    = "checks"
+  sources = ["src/checks/*.c"]
+
+  [[toolchains.cmake.tests]]
+  name   = "unit"
+  target = "checks"
+
+  [[toolchains.cmake.tests]]
+  name   = "app.smoke"
+  target = "app"
+  args   = ["--version", "two words"]
