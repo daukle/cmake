@@ -1,0 +1,5 @@
+name = "base"
+defines = ["FROM_DIR=1"]
+
+name = "tool"
+defines = ["FROM_DIR=1"]

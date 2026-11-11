@@ -1,0 +1,1 @@
+compiles C and C++, and daukle/cmake builds one language per project

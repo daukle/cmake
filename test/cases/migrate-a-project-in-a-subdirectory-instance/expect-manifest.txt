@@ -1,0 +1,3 @@
+dir = "native"
+
+sources = ["src/main.c"]

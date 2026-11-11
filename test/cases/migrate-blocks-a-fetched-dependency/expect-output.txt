@@ -1,0 +1,1 @@
+was produced by FetchContent, whose url and digest the model does not carry

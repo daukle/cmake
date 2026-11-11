@@ -35,7 +35,7 @@ local KNOWN_KEYS = {
   buildType = true, generator = true, configureArgs = true, buildArgs = true, runArgs = true,
   dependencies = true, compiler = true, targets = true, default = true, systemLinks = true,
   libraryType = true, extensions = true, outputName = true, tests = true, testArgs = true,
-  findPackages = true,
+  findPackages = true, minimumRequired = true,
 }
 
 --- A library target's `libraryType`, as the `add_library` keyword it renders. Without one the

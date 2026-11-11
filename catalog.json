@@ -1,0 +1,7 @@
+{
+  "detect": [
+    { "files": ["CMakeLists.txt"], "scope": "tree" }
+  ],
+  "replaces": {},
+  "skip": ["build"]
+}

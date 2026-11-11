@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.20)
+project(argpath LANGUAGES C)
+enable_testing()
+add_executable(app main.c)
+add_test(NAME self COMMAND app $<TARGET_FILE:app>)

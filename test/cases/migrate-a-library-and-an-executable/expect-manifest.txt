@@ -1,0 +1,4 @@
+version = "4.4"
+minimumRequired = "3.20"
+
+outputName = "tally"
