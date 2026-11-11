@@ -156,6 +156,8 @@ local function read(context)
     standard_property = STANDARD_PROPERTY[language],
     extensions_property = EXTENSIONS_PROPERTY[language],
     project_name = project_target,
+    -- core accepts only major.minor.patch, which is already what project(VERSION) takes
+    project_version = context.version,
     targets = project_targets,
     default = targets.default_target(config, project_targets),
     buildType = build_type or "Debug",

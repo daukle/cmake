@@ -322,6 +322,10 @@ subbuild, the link and the include propagation are all real, and `cmake:run` exe
 rather than asserting a file. `links-a-resolved-dependency` keeps its unfetchable fixture url and
 remains the byte-exact generation case.
 
+**The project's own `version` is CMake's `project(VERSION)`**, so `PROJECT_VERSION` and its
+components are set for anything the build reads them from. Core accepts only `major.minor.patch`,
+which is already a version CMake takes, so it is written as declared.
+
 ## Tasks
 
 `cmake:configure`, `cmake:build` (depends on configure), `cmake:run` and `cmake:test` (each
