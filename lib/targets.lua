@@ -15,7 +15,20 @@ local KNOWN_KEYS = {
 
 --- A library target's `libraryType`, as the `add_library` keyword it renders. Without one the
 --- keyword is left out and `BUILD_SHARED_LIBS` decides, which is what this plugin always did.
-local LIBRARY_KEYWORDS = { static = "STATIC", shared = "SHARED", module = "MODULE", object = "OBJECT" }
+local LIBRARY_KEYWORDS = {
+  static = "STATIC", shared = "SHARED", module = "MODULE", object = "OBJECT", interface = "INTERFACE",
+}
+
+--- What an `interface` library may not declare, each with the key that says it instead, or false
+--- when it has none.
+--- @implNote CMake refuses `PRIVATE` and `PUBLIC` on an INTERFACE target at configure time, naming
+--- no manifest line: it builds nothing, so only what reaches its consumers can describe it.
+local REPLACEMENT_ON_AN_INTERFACE_LIBRARY = {
+  sources = false, standard = false, systemLinks = false,
+  includes = "interfaceIncludes", publicIncludes = "interfaceIncludes",
+  defines = "interfaceDefines", publicDefines = "interfaceDefines",
+  links = "interfaceLinks", publicLinks = "interfaceLinks",
+}
 
 --[[ The five keys a TARGET owns. A project-wide key is not one of these: a
      generator or a build type is a property of the build, not of a thing the
@@ -124,10 +137,21 @@ local function library_keyword_of(value, kind, at)
   end
   local keyword = type(value) == "string" and LIBRARY_KEYWORDS[value] or nil
   if keyword == nil then
-    error(string.format('%s has a "libraryType" that must be "static", "shared", "module" or "object",'
-                        .. ' not "%s"', at, tostring(value)), 0)
+    error(string.format('%s has a "libraryType" that must be "static", "shared", "module", "object"'
+                        .. ' or "interface", not "%s"', at, tostring(value)), 0)
   end
   return keyword
+end
+
+local function refuse_build_keys_on_an_interface_library(entry, at)
+  for key, replacement in pairs(REPLACEMENT_ON_AN_INTERFACE_LIBRARY) do
+    if entry[key] ~= nil then
+      local remedy = replacement and string.format(': write it as "%s"', replacement)
+                     or ', since it compiles and links nothing'
+      error(string.format('%s is an "interface" library and declares "%s", which only a library that'
+                          .. ' is built can use%s', at, key, remedy), 0)
+    end
+  end
 end
 
 --- @implNote checked here because CMake refuses to link a MODULE library, at configure time and
@@ -190,11 +214,16 @@ local function targets_of(config, language, project_target, package_names)
     if #sources == 0 then
       error('"sources" is empty, so there is nothing to compile', 0)
     end
+    local library_keyword = library_keyword_of(config.libraryType, kind, "the project")
+    if library_keyword == "INTERFACE" then
+      error('an "interface" library is described by its "interfaceIncludes", "interfaceDefines" and'
+            .. ' "interfaceLinks", which are target keys: declare it in "targets"', 0)
+    end
     local only = {
       name = project_target,
       task = task_name_of(project_target),
       kind = kind,
-      libraryKeyword = library_keyword_of(config.libraryType, kind, "the project"),
+      libraryKeyword = library_keyword,
       sources = sources,
       includes = values.path_list(config.includes, "includes", "directories", "directory"),
       defines = values.cmake_text_list(config.defines, "defines", "definitions", "definition"),
@@ -246,16 +275,22 @@ local function targets_of(config, language, project_target, package_names)
                           at, tostring(kind)), 0)
     end
     refuse_usage_requirements_on_an_executable(entry, kind, at)
-    local sources = values.path_list(entry.sources, at .. ".sources", "globs", "glob")
-                    or default_sources(language)
-    if #sources == 0 then
-      error(string.format('%s has an empty "sources", so there is nothing to compile', at), 0)
+    local library_keyword = library_keyword_of(entry.libraryType, kind, at)
+    local sources = {}
+    if library_keyword == "INTERFACE" then
+      refuse_build_keys_on_an_interface_library(entry, at)
+    else
+      sources = values.path_list(entry.sources, at .. ".sources", "globs", "glob")
+                or default_sources(language)
+      if #sources == 0 then
+        error(string.format('%s has an empty "sources", so there is nothing to compile', at), 0)
+      end
     end
     out[index] = {
       name = name,
       task = task,
       kind = kind,
-      libraryKeyword = library_keyword_of(entry.libraryType, kind, at),
+      libraryKeyword = library_keyword,
       sources = sources,
       includes = values.path_list(entry.includes, at .. ".includes", "directories", "directory"),
       defines = values.cmake_text_list(entry.defines, at .. ".defines", "definitions",
@@ -315,6 +350,12 @@ local function default_target(config, targets)
   return nil
 end
 
+--- @implNote an INTERFACE library compiles nothing, so CMake gives it no build target and a
+--- `cmake --build --target` naming it fails: such a target gets no task of its own.
+local function has_no_build_target(entry)
+  return entry.libraryType == "interface"
+end
+
 --- The task name and kind of every target, read from the manifest as PARSED
 --- rather than from a run-time context, so a chunk can register one task per
 --- target before any command runs.
@@ -350,7 +391,9 @@ local function task_targets(document)
                           at, entry.name, seen[task].at, seen[task].name, task), 0)
     end
     seen[task] = { at = at, name = entry.name }
-    out[#out + 1] = { name = entry.name, task = task, kind = entry.kind or "executable" }
+    if not has_no_build_target(entry) then
+      out[#out + 1] = { name = entry.name, task = task, kind = entry.kind or "executable" }
+    end
   end
   return out
 end

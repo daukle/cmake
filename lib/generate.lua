@@ -57,11 +57,13 @@ local function render(spec)
     return "DAUKLE_SOURCES_" .. index
   end
 
-  local function put_target(target, index)
-    local variable = variable_for(index)
+  local function put_declaration(target, variable)
+    if target.libraryKeyword == "INTERFACE" then
+      put(string.format("add_library(%s INTERFACE)", target.name))
+      return
+    end
     put_source_glob(target, variable)
     put("")
-
     if target.kind == "library" then
       local keyword = target.libraryKeyword ~= nil and (target.libraryKeyword .. " ") or ""
       put(string.format("add_library(%s %s${%s})", target.name, keyword, variable))
@@ -73,6 +75,10 @@ local function render(spec)
       put(string.format("add_executable(%s ${%s})", target.name, variable))
       put_runtime_directory(target)
     end
+  end
+
+  local function put_target(target, index)
+    put_declaration(target, variable_for(index))
 
     local linked = {}
     for index_of_link = 1, #target.links do linked[#linked + 1] = target.links[index_of_link] end
