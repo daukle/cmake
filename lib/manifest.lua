@@ -86,6 +86,41 @@ local function refuse_a_runtime_directory(configure_args, project_targets)
   end
 end
 
+local DEFAULT_MINIMUM = "3.20"
+
+--- The floor CMake 4 still accepts; a lower `cmake_minimum_required` is an error there.
+local FLOOR_OF_CMAKE_4 = { major = 3, minor = 5 }
+
+local function major_minor_of(version)
+  local major, minor = string.match(version, "^(%d+)%.(%d+)")
+  return { major = tonumber(major), minor = tonumber(minor) }
+end
+
+local function is_below(version, floor)
+  return version.major < floor.major or (version.major == floor.major and version.minor < floor.minor)
+end
+
+--- The project's own `cmake_minimum_required`, which sets the policies CMake builds it under.
+local function minimum_required_of(value, cmake_version)
+  if value == nil then return DEFAULT_MINIMUM end
+  local shape = "^%d+%.%d+[%.%d]*$"
+  local floor, ceiling = nil, nil
+  if type(value) == "string" then
+    floor, ceiling = string.match(value, "^(.-)%.%.%.(.+)$")
+    if floor == nil then floor = value end
+  end
+  if floor == nil or string.match(floor, shape) == nil
+     or (ceiling ~= nil and string.match(ceiling, shape) == nil) then
+    error('"minimumRequired" must be a version such as "3.10" or a range such as "3.10...3.21",'
+          .. ' not "' .. tostring(value) .. '"', 0)
+  end
+  if string.sub(cmake_version, 1, 2) == "4." and is_below(major_minor_of(floor), FLOOR_OF_CMAKE_4) then
+    error(string.format('"minimumRequired" is "%s", below 3.5, which CMake %s refuses: pin "3.31"'
+                        .. ' or raise the floor', value, cmake_version), 0)
+  end
+  return value
+end
+
 local function reject_unknown_keys(config)
   for key in pairs(config) do
     if targets.KNOWN_KEYS[key] == nil then
@@ -154,8 +189,10 @@ local function read(context)
                                             "argument")
   refuse_a_runtime_directory(configure_args, project_targets)
 
+  local cmake_version = version_of(context)
   return {
-    version = version_of(context),
+    version = cmake_version,
+    minimum_required = minimum_required_of(config.minimumRequired, cmake_version),
     language = language,
     cmake_language = LANGUAGES[language],
     standard_property = STANDARD_PROPERTY[language],

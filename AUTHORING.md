@@ -27,6 +27,7 @@ version = "4.4"
 | --- | --- | --- |
 | `version` | required | which pinned CMake to provision. **`"4.4"` or `"3.31"`**; see below for why there are two |
 | `language` | `"c"` | `"c"` or `"c++"` |
+| `minimumRequired` | `"3.20"` | the project's own `cmake_minimum_required`, a version or a range such as `"3.10...3.21"`, which decides the policies CMake builds under; below 3.5 is refused on CMake 4 |
 | `kind` | `"executable"` | `"executable"` or `"library"` |
 | `sources` | per language | globs, relative to the project, resolved with `CONFIGURE_DEPENDS`. `c` defaults to `["src/*.c"]`, `c++` to `["src/*.cpp", "src/*.cc", "src/*.cxx"]` |
 | `includes` | none | directories added as `PRIVATE` include paths |
