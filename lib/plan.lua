@@ -62,6 +62,9 @@ local function source_lines(target, base, project_root)
   return lines
 end
 
+--- @implNote flags are listed one per line rather than per fragment, because CMake groups the
+--- same flags into fragments differently: `COMPILE_FLAGS` gives one fragment, the `SHELL:` option
+--- the migration carries it as gives one per flag, and the compiler sees the same command line.
 local function group_lines(group, base, project_root)
   local standard = group.languageStandard ~= nil and group.languageStandard.standard or "-"
   local lines = { string.format("  group %s standard %s", group.language or "-", standard) }
@@ -77,7 +80,7 @@ local function group_lines(group, base, project_root)
     end
   end
   for _, fragment in ipairs(group.compileCommandFragments or {}) do
-    lines[#lines + 1] = "  fragment " .. fragment.fragment
+    for flag in string.gmatch(fragment.fragment, "%S+") do lines[#lines + 1] = "  fragment " .. flag end
   end
   return lines
 end
@@ -95,7 +98,7 @@ local function link_lines(reply, target)
   return lines
 end
 
---- @implNote every flag fragment of the link and archive lines, CMake's defaults included: the
+--- @implNote every flag of the link and archive lines, one per line as compile flags are,, CMake's defaults included: the
 --- translation carries no link options, so a project that sets one differs here and the proof fails
 --- rather than passing on a different binary.
 local function flag_lines(target)
@@ -103,7 +106,9 @@ local function flag_lines(target)
   for _, step in ipairs({ { "link-flag", target.link }, { "archive-flag", target.archive } }) do
     local fragments = step[2] ~= nil and step[2].commandFragments or {}
     for _, fragment in ipairs(fragments) do
-      if fragment.role == "flags" then lines[#lines + 1] = "  " .. step[1] .. " " .. fragment.fragment end
+      if fragment.role == "flags" then
+        for flag in string.gmatch(fragment.fragment, "%S+") do lines[#lines + 1] = "  " .. step[1] .. " " .. flag end
+      end
     end
   end
   return lines
