@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.20)
+project(imported LANGUAGES C)
+add_library(ext STATIC IMPORTED)
+set_target_properties(ext PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/libext.a)
+add_executable(app main.c)
+target_link_libraries(app PRIVATE ext)

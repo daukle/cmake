@@ -1,0 +1,1 @@
+links "vendor::foo", and CMake read no Findvendor.cmake or vendorConfig.cmake for it

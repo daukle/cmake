@@ -66,7 +66,8 @@ local function group_lines(group, base, project_root)
   local standard = group.languageStandard ~= nil and group.languageStandard.standard or "-"
   local lines = { string.format("  group %s standard %s", group.language or "-", standard) }
   for _, include in ipairs(group.includes or {}) do
-    lines[#lines + 1] = path_line("include", include.path, base, project_root)
+    lines[#lines + 1] = path_line(include.isSystem and "include-system" or "include", include.path, base,
+                                  project_root)
   end
   local seen = {}
   for _, define in ipairs(group.defines or {}) do
@@ -94,6 +95,20 @@ local function link_lines(reply, target)
   return lines
 end
 
+--- @implNote every flag fragment of the link and archive lines, CMake's defaults included: the
+--- translation carries no link options, so a project that sets one differs here and the proof fails
+--- rather than passing on a different binary.
+local function flag_lines(target)
+  local lines = {}
+  for _, step in ipairs({ { "link-flag", target.link }, { "archive-flag", target.archive } }) do
+    local fragments = step[2] ~= nil and step[2].commandFragments or {}
+    for _, fragment in ipairs(fragments) do
+      if fragment.role == "flags" then lines[#lines + 1] = "  " .. step[1] .. " " .. fragment.fragment end
+    end
+  end
+  return lines
+end
+
 local function is_listed(target)
   return not target.isGeneratorProvided and target.name ~= "ALL_BUILD" and target.name ~= "ZERO_CHECK"
 end
@@ -109,6 +124,7 @@ local function target_block(reply, target, project_root)
   append(lines, source_lines(target, base, project_root))
   for _, group in ipairs(target.compileGroups or {}) do append(lines, group_lines(group, base, project_root)) end
   append(lines, link_lines(reply, target))
+  append(lines, flag_lines(target))
   return table.concat(lines, "\n")
 end
 

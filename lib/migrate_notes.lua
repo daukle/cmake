@@ -38,6 +38,10 @@ local function of(reply, root, translated)
   local notes = frozen_options(reply)
   for _, note in ipairs(install_rules(reply, root)) do notes[#notes + 1] = note end
   for _, dropped in ipairs(translated.dropped) do notes[#notes + 1] = "not migrated: " .. dropped end
+  for _, package in ipairs(translated.config.findPackages or {}) do
+    notes[#notes + 1] = "found " .. package.name .. " with no version or components: the model does"
+                        .. " not carry what the original find_package asked for"
+  end
   return notes
 end
 

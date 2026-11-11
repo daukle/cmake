@@ -77,6 +77,39 @@ local function escaped_values_blockers(entry, where, out)
   end
 end
 
+local function file_name_of(path)
+  return string.match(string.gsub(path, "\\", "/"), "([^/]+)$") or path
+end
+
+--- Whether the read's configure loaded the file `find_package(<package>)` reads, module or config.
+local function package_was_found(reply, package)
+  local wanted = { ["Find" .. package .. ".cmake"] = true, [package .. "Config.cmake"] = true,
+                   [string.lower(package) .. "-config.cmake"] = true }
+  for _, input in ipairs(reply.cmake_inputs or {}) do
+    if wanted[file_name_of(input.path)] then return true end
+  end
+  return false
+end
+
+--- @implNote a link to an imported target becomes a `findPackages` entry named by its namespace,
+--- so one with no namespace, or whose namespace no package file provided, has no translation.
+local function imported_link_blockers(target, where, reply, out)
+  for _, link in ipairs(target.linkLibraries or {}) do
+    local name = link.id ~= nil and plan.name_of_id(link.id) or nil
+    local abstract = name ~= nil and reply.abstract[name] or nil
+    if abstract ~= nil and abstract.imported then
+      local package = string.match(name, "^(.-)::")
+      if package == nil then
+        out[#out + 1] = blocker(target.name, where, string.format('links the imported target "%s", which no'
+                                .. ' package provides by name', name), DEPENDENCIES_ROW)
+      elseif not package_was_found(reply, package) then
+        out[#out + 1] = blocker(target.name, where, string.format('links "%s", and CMake read no Find%s.cmake'
+                                .. ' or %sConfig.cmake for it', name, package, package), DEPENDENCIES_ROW)
+      end
+    end
+  end
+end
+
 local function languages_of(reply)
   local languages = {}
   for _, target in pairs(reply.targets) do
@@ -102,6 +135,7 @@ local function target_blockers(target, reply, root, translated_entry, out)
   end
   source_blockers(target, where, reply, root, out)
   include_blockers(target, where, reply, root, out)
+  imported_link_blockers(target, where, reply, out)
   if #(target.compileGroups or {}) > 1 then
     out[#out + 1] = blocker(target.name, where, "compiles its sources with different settings, and a"
                             .. " daukle/cmake target has one set", REQUIREMENTS_ROW)
