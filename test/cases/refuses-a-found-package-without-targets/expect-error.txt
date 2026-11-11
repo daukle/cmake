@@ -1,0 +1,1 @@
+findPackages[1].targets must name the imported targets the package provides, such as "ZLIB::ZLIB"
