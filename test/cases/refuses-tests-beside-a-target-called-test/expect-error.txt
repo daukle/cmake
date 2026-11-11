@@ -1,0 +1,1 @@
+the target "test" takes the task "cmake:test", which is the one that runs "tests": rename the target to declare tests

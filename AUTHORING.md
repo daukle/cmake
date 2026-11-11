@@ -32,13 +32,21 @@ version = "4.4"
 | `includes` | none | directories added as `PRIVATE` include paths |
 | `defines` | none | compile definitions |
 | `standard` | none | the language standard, e.g. `17` |
+| `systemIncludes` | none | directories added as `PRIVATE` `SYSTEM` include paths, whose headers raise no warnings |
+| `compileOptions`, `linkOptions` | none | flags for the compiler and the linker, passed as written |
+| `features` | none | CMake compile features, e.g. `["c_std_11"]` |
+| `extensions` | CMake's | `true` or `false`, the compiler's language extensions |
+| `outputName` | the target's name | the file name CMake writes, which `cmake:run` starts |
+| `libraryType` | none | on a library, `"static"`, `"shared"`, `"module"` or `"object"`; `"interface"` only under `targets` |
 | `buildType` | `"Debug"` | the CMake build type |
 | `generator` | none | passed to `-G`; see the generator note below |
 | `compiler` | none | a `daukle/c` clang version, e.g. `"21"`. Provisions that compiler AND Ninja and drives the build with both; see below |
 | `systemLinks` | none | libraries the HOST provides, e.g. `["m", "pthread"]`; see below. Moves onto each target when `targets` is declared |
 | `configureArgs`, `buildArgs` | none | passed through verbatim to CMake's configure and build steps; see below |
 | `runArgs` | none | your program's argv under `cmake:run` and `cmake:run-<name>`, verbatim; see below |
-| `targets` | none | a list of targets; see below. Declaring it moves `kind`, `sources`, `includes`, `defines` and `standard` onto each target |
+| `tests` | none | a list of tests that `cmake:test` runs through ctest; see Tasks |
+| `testArgs` | none | passed to ctest after its own flags, e.g. `["-R", "unit", "-j", "4"]` |
+| `targets` | none | a list of targets; see below. Declaring it moves every target key above onto each target |
 | `default` | the only executable | which executable `cmake:run` means, when there is more than one |
 
 ### More than one target
@@ -316,10 +324,25 @@ remains the byte-exact generation case.
 
 ## Tasks
 
-`cmake:configure`, `cmake:build` (depends on configure) and `cmake:run` (depends on build).
-`cmake:run` on a `kind = "library"` project is an error, not a no-op.
+`cmake:configure`, `cmake:build` (depends on configure), `cmake:run` and `cmake:test` (each
+depends on build). `cmake:run` on a `kind = "library"` project is an error, not a no-op, and so is
+`cmake:test` on a project that declares no `tests`.
 
-`cmake:build` and `cmake:run` are named through `daukle/lifecycle`, which this plugin requires
+**A test runs an executable target with arguments**, and `cmake:test` runs every one through the
+pinned CMake's own ctest, against the build directory, printing a failing test's output:
+
+```toml
+[[toolchains.cmake.tests]]
+name   = "unit"
+target = "checks"
+args   = ["--fast"]
+```
+
+A test's `name` holds letters, digits, `.`, `_` and `-`, and two tests may not share one. A target
+called `test` already owns the task `cmake:test`, so a project with one keeps it and gets no test
+task, and declaring `tests` beside it is refused until the target is renamed.
+
+`cmake:build`, `cmake:run` and `cmake:test` are named through `daukle/lifecycle`, which this plugin requires
 and which checks each declaration against the contract its name promises. `cmake:configure` is
 not a lifecycle name and stays a literal: it is this toolchain's own step, not a standard one.
 
@@ -384,11 +407,6 @@ prints which on every configure, id, version and path (`D-186`). CMake prints it
 identification line only when it first detects the compiler, measured on 4.4: a second configure
 from the same cache prints none, which `names-the-compiler-on-a-cached-configure` proves with the
 harness's `rerun` marker.
-
-**`cmake:<target>` and `cmake:run-<target>` now exist**, and the paragraph here said they could not
-until `D-110` resolved. It has: core publishes `daukle.manifest`, so registration reads the manifest
-daukle was started from and imposes no filename on anyone. The cost this plugin refused to pay is
-gone rather than accepted. See Targets.
 
 **One generated file, so no `add_subdirectory`.** A large CMake project is organised as a
 `CMakeLists.txt` per directory and this generates one. Targets are flat.
