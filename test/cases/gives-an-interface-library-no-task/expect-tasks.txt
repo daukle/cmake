@@ -1,0 +1,3 @@
+cmake:app
+cmake:fixed
+cmake:run-app

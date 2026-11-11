@@ -13,5 +13,5 @@ version = "4.4"
   [[toolchains.cmake.targets]]
   name        = "greet"
   kind        = "library"
-  libraryType = "interface"
+  libraryType = "dynamic"
   sources     = ["src/*.c"]

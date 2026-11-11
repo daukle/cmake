@@ -1,0 +1,1 @@
+targets[1] is an "interface" library and declares "includes", which only a library that is built can use: write it as "interfaceIncludes"

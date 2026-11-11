@@ -81,6 +81,14 @@ loader looks for there. Linking a `module` library is refused, since CMake loads
 cannot link it. On Windows a shared library exports nothing unless its code says so, so a project
 without `__declspec(dllexport)` passes `-DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=ON` in `configureArgs`.
 
+**An `interface` library is a header-only one: it compiles nothing and is described only by what
+reaches its consumers.** It renders as `add_library(<name> INTERFACE)` and takes `interfaceIncludes`,
+`interfaceDefines` and `interfaceLinks`; `sources`, `standard`, `systemLinks` and the private and
+`public*` keys are refused, since CMake refuses them on a target it does not build. It has no
+`cmake:<name>` task, because CMake gives it no build target, and it is refused on the one-target
+shape, which has no `interface*` keys. A target that links it gets its includes, its definitions and
+its own links.
+
 **`links` names another declared target or a package the resolver fetches, and anything else is
 refused where the manifest is read.** CMake reports an unknown link as a missing library at LINK
 time with no mention of the manifest, which is a long way from the typo.
