@@ -1,5 +1,6 @@
 local values = daukle.require("lib/values")
 local targets = daukle.require("lib/targets")
+local tests = daukle.require("lib/tests")
 
 local LANGUAGES = { c = "C", ["c++"] = "CXX" }
 local STANDARD_PROPERTY = { c = "C_STANDARD", ["c++"] = "CXX_STANDARD" }
@@ -163,9 +164,12 @@ local function read(context)
     configureArgs = configure_args,
     buildArgs = values.string_list(config.buildArgs, "buildArgs", "arguments", "argument"),
     runArgs = values.string_list(config.runArgs, "runArgs", "arguments", "argument"),
+    tests = tests.tests_of(config, project_targets),
+    testArgs = values.string_list(config.testArgs, "testArgs", "arguments", "argument"),
     dependencies = dependencies,
     root = context.root,
   }
 end
 
-return { read = read, task_name_of = targets.task_name_of, task_targets = targets.task_targets }
+return { read = read, task_name_of = targets.task_name_of, task_targets = targets.task_targets,
+         TEST_TASK = tests.TEST_TASK }

@@ -172,6 +172,16 @@ local function render(spec)
     put_target(spec.targets[index], index)
   end
 
+  if #spec.tests > 0 then
+    put("")
+    put("enable_testing()")
+    for _, test in ipairs(spec.tests) do
+      local words = { "NAME", test.name, "COMMAND", test.target }
+      for _, argument in ipairs(test.args) do words[#words + 1] = string.format('"%s"', argument) end
+      put(string.format("add_test(%s)", table.concat(words, " ")))
+    end
+  end
+
   return table.concat(out, "\n") .. "\n"
 end
 

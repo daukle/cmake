@@ -1,0 +1,2 @@
+cmake:test
+cmake:run-test
