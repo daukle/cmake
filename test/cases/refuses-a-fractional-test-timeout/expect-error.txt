@@ -1,0 +1,1 @@
+tests[1].timeout must be a whole number of seconds above 0, not 1.5

@@ -1,0 +1,1 @@
+tests[1].labels holds "two words", and a label holds only letters, digits, ".", "_" and "-"

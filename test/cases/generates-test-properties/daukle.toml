@@ -1,0 +1,24 @@
+schema = 1
+project = "example/app"
+version = "1.0.0"
+
+[modules]
+
+[plugins]
+cmake = "./plugins/cmake"
+
+[toolchains.cmake]
+version = "4.4"
+
+  [[toolchains.cmake.tests]]
+  name             = "unit"
+  target           = "app"
+  workingDirectory = "test/data"
+  labels           = ["fast", "unit"]
+  timeout          = 30
+
+  [[toolchains.cmake.tests]]
+  name     = "rejects-bad-input"
+  target   = "app"
+  args     = ["bad"]
+  willFail = true
