@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.20)
+project(tested LANGUAGES C)
+enable_testing()
+add_executable(checks checks.c)
+add_test(NAME passes COMMAND checks ok)

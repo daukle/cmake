@@ -428,6 +428,34 @@ green run that tested nothing.
 platform, so a checkout under `core.autocrlf=true` rewrites the fixtures and the byte-exact cases
 fail on Windows for a reason that has nothing to do with the plugin.
 
+## Migration
+
+`daukle migrate` turns a CMake project into a `[toolchains.cmake]` block and deletes its CMake files
+once the result is proved (`D-280`; the design is `docs`' `superpowers/specs/2026-11-11-cmake-migrator-design.md`).
+
+1. **It reads the project once.** CMake 4.4 configures the project's own `CMakeLists.txt` into
+   `build/daukle/<instance>/migrate-read` with a file API query, which reports every target as
+   evaluated, after each `add_subdirectory`, `option`, `if`, function and `foreach` has run. A
+   project declaring tests is also built there, because a multi-config generator names a test's
+   program only once it is built. This is the only time the project's CMake files run.
+2. **It translates** each target into a `targets` entry with its effective sources, includes,
+   defines and compile options, all `PRIVATE`, CMake's own default flags left out; a link to an
+   imported target becomes a `findPackages` entry, an interface library is folded into the targets
+   that use it, and `add_test` entries become `tests`. The floor is the root file's own
+   `cmake_minimum_required`, and the version is always `4.4`.
+3. **It proves** through core: both builds are described as a plan of their targets and tests
+   (`cmake:plan` writes the new one), and core compares the two byte for byte, naming the lines
+   that differ. The old CMake files then move to `build/daukle/migrate/old`.
+
+**Every `option` is frozen** at the value the read configured with, and **install rules are not
+migrated**; both are printed as `daukle migrate: migrator cmake: ...` lines and do not block
+(`RULES.md`, 2026-11-11). **It blocks**, naming the file and the target, on a generated source, a
+source or include outside the project or written by a configure, C and C++ in one project, a
+`UTILITY` target, a `FetchContent` target, per-source settings, a value holding a character this
+plugin refuses, and a test property other than `WORKING_DIRECTORY`, `LABELS`, `TIMEOUT` and
+`WILL_FAIL`. Exit codes: `0` migrated and proved, `3` blocked, `4` migrated but not proved, `1` the
+read failed.
+
 ## Limits
 
 CMake picks the compiler unless `compiler` provisions one, and the generated `CMakeLists.txt`

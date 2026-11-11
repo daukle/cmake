@@ -1,0 +1,5 @@
+daukle.toml
+app/main.c
+lib/core.c
+build/daukle/migrate/old/CMakeLists.txt
+build/daukle/migrate/old/lib/CMakeLists.txt

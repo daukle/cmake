@@ -29,6 +29,8 @@ local generate = daukle.require("lib/generate")
 local file_api = daukle.require("lib/file_api")
 local plan = daukle.require("lib/plan")
 local migrator = daukle.require("lib/migrator")
+local migrate_read = daukle.require("lib/migrate_read")
+local migrate_tests = daukle.require("lib/migrate_tests")
 
 daukle.toolchain{
   name = "cmake",
@@ -66,8 +68,8 @@ end
 daukle.migrator{
   tool = "cmake",
   toolchain = "cmake",
-  run = migrator.run_with(function(context, version)
-    return provision_cmake_program(context, { version = version }, "cmake")
+  run = migrator.run_with(function(context, version, program)
+    return provision_cmake_program(context, { version = version }, program)
   end),
 }
 
@@ -309,6 +311,10 @@ daukle.task{
     configure(context, spec)
     local derived = "build/daukle/" .. (context.instance or context.toolchain.name)
     local reply = file_api.read_reply(derived .. "/" .. BUILD_DIR, spec.buildType)
-    daukle.write{ path = plan.FILE, text = plan.text(reply, reply.source_root .. "/" .. context.root) }
+    local root = reply.source_root .. "/" .. context.root
+    local listed = migrate_read.tests_of(provision_cmake(context, spec),
+                                         provision_cmake_program(context, spec, "ctest"), BUILD_DIR, spec.buildType)
+    local tests = migrate_tests.of(listed, reply, root)
+    daukle.write{ path = plan.FILE, text = plan.text(reply, root, migrate_read.plan_lines(tests)) }
   end,
 }

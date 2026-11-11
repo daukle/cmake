@@ -1,0 +1,3 @@
+name = "passes"
+target = "checks"
+args = ["ok"]
