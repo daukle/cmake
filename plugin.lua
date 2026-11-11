@@ -178,8 +178,15 @@ daukle.task(names.assert_contract(names.BUILD, {
      relative path. ]]
 local PROGRAM_CWD = "build/daukle/cmake/_b"
 
+local function file_name_of(spec, target_name)
+  for _, target in ipairs(spec.targets) do
+    if target.name == target_name then return target.outputName or target_name end
+  end
+  return target_name
+end
+
 local function run_program(context, spec, target_name)
-  local program = "_b/" .. generate.RUNTIME_DIRECTORY .. "/" .. target_name
+  local program = "_b/" .. generate.RUNTIME_DIRECTORY .. "/" .. file_name_of(spec, target_name)
                   .. executable_suffix(context)
   local result = daukle.exec(daukle.built(program), spec.runArgs or {},
                              { cwd = PROGRAM_CWD, check = false })

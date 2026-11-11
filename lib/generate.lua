@@ -57,6 +57,18 @@ local function render(spec)
     return "DAUKLE_SOURCES_" .. index
   end
 
+  local function put_include_groups(target_name, system, groups)
+    for group_index, group in ipairs(groups) do
+      if group_index == 1 then
+        put(string.format("target_include_directories(%s %s%s", target_name, system, group.keyword))
+      else
+        put("    " .. group.keyword)
+      end
+      for _, include in ipairs(group.items) do put("     " .. source_path(include)) end
+    end
+    if #groups > 0 then put(")") end
+  end
+
   local function put_quoted_groups(command, target_name, groups)
     if #groups == 0 then return end
     local words = {}
@@ -105,17 +117,11 @@ local function render(spec)
       put(string.format("target_link_libraries(%s %s)", target.name, table.concat(words, " ")))
     end
 
-    local include_groups = visibility_groups(target.includes, target.publicIncludes,
-                                             target.interfaceIncludes)
-    for group_index, group in ipairs(include_groups) do
-      if group_index == 1 then
-        put(string.format("target_include_directories(%s %s", target.name, group.keyword))
-      else
-        put("    " .. group.keyword)
-      end
-      for _, include in ipairs(group.items) do put("     " .. source_path(include)) end
-    end
-    if #include_groups > 0 then put(")") end
+    put_include_groups(target.name, "",
+                       visibility_groups(target.includes, target.publicIncludes, target.interfaceIncludes))
+    put_include_groups(target.name, "SYSTEM ",
+                       visibility_groups(target.systemIncludes, target.publicSystemIncludes,
+                                         target.interfaceSystemIncludes))
 
     put_quoted_groups("target_compile_definitions", target.name,
                       visibility_groups(target.defines, target.publicDefines, target.interfaceDefines))
@@ -126,10 +132,22 @@ local function render(spec)
                       visibility_groups(target.linkOptions, target.publicLinkOptions,
                                         target.interfaceLinkOptions))
 
+    put_quoted_groups("target_compile_features", target.name,
+                      visibility_groups(target.features, target.publicFeatures,
+                                        target.interfaceFeatures))
+
     if target.standard ~= nil then
       put(string.format('set_target_properties(%s PROPERTIES %s "%s" %s_REQUIRED ON)',
                         target.name, spec.standard_property, target.standard,
                         spec.standard_property))
+    end
+    if target.extensions ~= nil then
+      put(string.format("set_target_properties(%s PROPERTIES %s %s)", target.name,
+                        spec.extensions_property, target.extensions and "ON" or "OFF"))
+    end
+    if target.outputName ~= nil then
+      put(string.format('set_target_properties(%s PROPERTIES OUTPUT_NAME "%s")', target.name,
+                        target.outputName))
     end
   end
 

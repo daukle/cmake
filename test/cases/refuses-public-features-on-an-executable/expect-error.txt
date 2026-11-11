@@ -1,0 +1,1 @@
+targets[1] is an executable and declares "publicFeatures": nothing links an executable, so it has no consumer for that to reach. Write it as "features"
