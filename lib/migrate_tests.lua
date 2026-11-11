@@ -24,6 +24,10 @@ local function needs_build(tests)
   return false
 end
 
+local function is_absolute(path)
+  return string.match(path, "^/") ~= nil or string.match(path, "^%a:[/\\]") ~= nil
+end
+
 local function target_of_program(program, reply)
   local wanted = plan.normalised(program)
   for name, target in pairs(reply.targets) do
@@ -48,9 +52,17 @@ end
 
 --- @implNote ctest's default working directory is the build directory, which differs between
 --- the read and the new build, so only a directory the project chose is carried.
+local function is_below_or_at(path, directory)
+  local full, base = plan.normalised(path), plan.normalised(directory)
+  return full == base or string.sub(full, 1, #base + 1) == base .. "/"
+end
+
 local function working_directory_of(test, reply, root)
   local directory = property_of(test, "WORKING_DIRECTORY")
   if directory == nil or plan.normalised(directory) == plan.normalised(reply.build_root) then return nil, nil end
+  if is_below_or_at(directory, reply.build_root) then
+    return nil, 'runs in its own build directory "' .. directory .. '", which the flattened build does not have'
+  end
   local relative = plan.project_relative(directory, reply.source_root, root)
   if relative == nil or string.sub(relative, 1, 6) == "build/" then
     return nil, 'runs in "' .. directory .. '", outside the project'
@@ -82,7 +94,11 @@ local function test_entry(test, reply, root, blockers)
   end
   local args = {}
   for index = 2, #test.command do
-    if values.escapes_cmake(test.command[index]) then
+    if is_absolute(test.command[index])
+       and (is_below_or_at(test.command[index], reply.build_root) or is_below_or_at(test.command[index], root)) then
+      blockers[#blockers + 1] = blocker(test, 'passes "' .. test.command[index] .. '", which lies in the old'
+                                        .. ' build or names a path daukle/cmake would carry as text')
+    elseif values.escapes_cmake(test.command[index]) then
       blockers[#blockers + 1] = blocker(test, 'passes "' .. test.command[index] .. '", which holds a'
                                         .. ' character daukle/cmake refuses in a generated file')
     end

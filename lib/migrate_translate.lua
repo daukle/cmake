@@ -81,11 +81,12 @@ local function compile_options_of(group, cache, configuration)
   return options
 end
 
-local function relative_paths(entries, field, reply, root)
+--- The group's include directories, plain or `SYSTEM` as `system` asks.
+local function include_paths(group, reply, root, system)
   local paths = {}
-  for _, entry in ipairs(entries or {}) do
-    local relative = plan.project_relative(entry[field], reply.source_root, root)
-    if relative ~= nil then paths[#paths + 1] = relative end
+  for _, include in ipairs(group.includes or {}) do
+    local relative = plan.project_relative(include.path, reply.source_root, root)
+    if relative ~= nil and (include.isSystem == true) == system then paths[#paths + 1] = relative end
   end
   return paths
 end
@@ -147,7 +148,8 @@ local function target_entry(target, reply, root, configuration, imported)
     kind = shape.kind,
     libraryType = shape.libraryType,
     sources = sources_of(target, reply, root),
-    includes = nonempty(relative_paths(group.includes, "path", reply, root)),
+    includes = nonempty(include_paths(group, reply, root, false)),
+    systemIncludes = nonempty(include_paths(group, reply, root, true)),
     defines = nonempty(defines_of(group)),
     compileOptions = nonempty(compile_options_of(group, reply.cache, configuration)),
     standard = standard,
@@ -161,11 +163,11 @@ local function find_packages_of(imported)
   local by_package, names = {}, {}
   for name in pairs(imported) do
     local package = string.match(name, "^(.-)::")
-    if by_package[package] == nil then
+    if package ~= nil and by_package[package] == nil then
       by_package[package] = {}
       names[#names + 1] = package
     end
-    table.insert(by_package[package], name)
+    if package ~= nil then table.insert(by_package[package], name) end
   end
   table.sort(names)
   local packages = {}
