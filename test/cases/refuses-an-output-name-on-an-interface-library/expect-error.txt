@@ -1,0 +1,1 @@
+targets[1] is an "interface" library and declares "outputName", which only a library that is built can use, since it compiles and links nothing

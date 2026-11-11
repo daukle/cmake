@@ -3,6 +3,7 @@ local targets = daukle.require("lib/targets")
 
 local LANGUAGES = { c = "C", ["c++"] = "CXX" }
 local STANDARD_PROPERTY = { c = "C_STANDARD", ["c++"] = "CXX_STANDARD" }
+local EXTENSIONS_PROPERTY = { c = "C_EXTENSIONS", ["c++"] = "CXX_EXTENSIONS" }
 local function config_of(context)
   if context.toolchain ~= nil then return context.toolchain.config end
   return context.config
@@ -152,6 +153,7 @@ local function read(context)
     language = language,
     cmake_language = LANGUAGES[language],
     standard_property = STANDARD_PROPERTY[language],
+    extensions_property = EXTENSIONS_PROPERTY[language],
     project_name = project_target,
     targets = project_targets,
     default = targets.default_target(config, project_targets),

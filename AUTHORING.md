@@ -62,10 +62,10 @@ version = "4.4"
   links   = ["greet"]
 ```
 
-A target owns `name`, `kind`, `sources`, `includes`, `defines`, `standard`, `links`,
-`systemLinks`, `compileOptions` and `linkOptions`, and a library also `libraryType` and the
-`public*` and `interface*` forms of `includes`, `defines`, `links`, `compileOptions` and
-`linkOptions`; everything else stays project wide.
+A target owns `name`, `kind`, `sources`, `standard`, `extensions`, `outputName`, `systemLinks`
+and the usage requirements `includes`, `systemIncludes`, `defines`, `links`, `compileOptions`,
+`linkOptions` and `features`, and a library also `libraryType` and the `public*` and `interface*`
+form of each usage requirement; everything else stays project wide.
 **A project-wide `sources` beside `targets` is refused** rather than silently applying to none of them.
 
 **`includes`, `defines` and `links` are `PRIVATE`: they build the target and reach nothing that
@@ -81,6 +81,14 @@ follow the same rules as the other usage requirements; the private two also work
 shape. CMake drops a repeated option, so a flag with a separate argument is written as one
 `SHELL:` entry, such as `"SHELL:-include config.h"`. A flag is passed as written, so one that only
 some compilers know is the project's choice to make.
+
+**`systemIncludes` are include directories CMake marks `SYSTEM`**, so a compiler does not warn
+about the headers in them, which is what a vendored dependency's directory wants. **`features`
+are CMake's compile features**, such as `cxx_std_17` or `c_std_11`, which ask for the standard
+that provides them rather than setting one; `interfaceFeatures` on a header-only library is how it
+says which standard its headers need. **`extensions`** turns the compiler's language extensions
+on or off (`C_EXTENSIONS`, `CXX_EXTENSIONS`). **`outputName`** names the file CMake writes for the
+target, a plain file name with no directory, and `cmake:run` starts an executable by that name.
 
 **A library's `libraryType` is `static`, `shared`, `module` or `object`**, rendered as that
 `add_library` keyword; without it no keyword is written and `BUILD_SHARED_LIBS` decides. A shared or

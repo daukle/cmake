@@ -1,0 +1,1 @@
+"outputName" must be a file name of letters, digits, ".", "_" and "-", not "bin/tool"

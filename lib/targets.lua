@@ -6,12 +6,35 @@ local DEFAULT_SOURCES = {
   ["c++"] = { "src/*.cpp", "src/*.cc", "src/*.cxx" },
 }
 
+--- The usage requirements, each a private key with a `public*` and an `interface*` form that
+--- reach the target's consumers, and the reader that checks its values.
+local REQUIREMENT_FAMILIES = {
+  { key = "includes", read = function(value, at)
+      return values.path_list(value, at, "directories", "directory") end },
+  { key = "systemIncludes", read = function(value, at)
+      return values.path_list(value, at, "directories", "directory") end },
+  { key = "defines", read = function(value, at)
+      return values.cmake_text_list(value, at, "definitions", "definition") end },
+  { key = "links", read = function(value, at)
+      return values.cmake_text_list(value, at, "target names", "target name") or {} end },
+  { key = "compileOptions", read = function(value, at)
+      return values.cmake_text_list(value, at, "options", "option") end },
+  { key = "linkOptions", read = function(value, at)
+      return values.cmake_text_list(value, at, "options", "option") end },
+  { key = "features", read = function(value, at)
+      return values.cmake_text_list(value, at, "features", "feature") end },
+}
+
+local function consumer_forms_of(key)
+  local capitalised = string.upper(string.sub(key, 1, 1)) .. string.sub(key, 2)
+  return "public" .. capitalised, "interface" .. capitalised
+end
+
 local KNOWN_KEYS = {
-  version = true, language = true, kind = true, sources = true, includes = true,
-  defines = true, standard = true, buildType = true, generator = true,
-  configureArgs = true, buildArgs = true, runArgs = true, dependencies = true,
-  compiler = true, targets = true, default = true, systemLinks = true, libraryType = true,
-  compileOptions = true, linkOptions = true,
+  version = true, language = true, kind = true, sources = true, standard = true,
+  buildType = true, generator = true, configureArgs = true, buildArgs = true, runArgs = true,
+  dependencies = true, compiler = true, targets = true, default = true, systemLinks = true,
+  libraryType = true, extensions = true, outputName = true,
 }
 
 --- A library target's `libraryType`, as the `add_library` keyword it renders. Without one the
@@ -20,46 +43,34 @@ local LIBRARY_KEYWORDS = {
   static = "STATIC", shared = "SHARED", module = "MODULE", object = "OBJECT", interface = "INTERFACE",
 }
 
---- What an `interface` library may not declare, each with the key that says it instead, or false
---- when it has none.
---- @implNote CMake refuses `PRIVATE` and `PUBLIC` on an INTERFACE target at configure time, naming
---- no manifest line: it builds nothing, so only what reaches its consumers can describe it.
-local REPLACEMENT_ON_AN_INTERFACE_LIBRARY = {
-  sources = false, standard = false, systemLinks = false,
-  includes = "interfaceIncludes", publicIncludes = "interfaceIncludes",
-  defines = "interfaceDefines", publicDefines = "interfaceDefines",
-  links = "interfaceLinks", publicLinks = "interfaceLinks",
-  compileOptions = "interfaceCompileOptions", publicCompileOptions = "interfaceCompileOptions",
-  linkOptions = "interfaceLinkOptions", publicLinkOptions = "interfaceLinkOptions",
-}
-
 --[[ The keys a TARGET owns. A project-wide key is not one of these: a
      generator or a build type is a property of the build, not of a thing the
      build produces, and letting a target carry one would mean two targets
      could ask for different generators. ]]
 local TARGET_KEYS = {
-  name = true, kind = true, sources = true, includes = true, defines = true,
-  standard = true, links = true, systemLinks = true, libraryType = true,
-  publicIncludes = true, interfaceIncludes = true, publicDefines = true, interfaceDefines = true,
-  publicLinks = true, interfaceLinks = true,
-  compileOptions = true, publicCompileOptions = true, interfaceCompileOptions = true,
-  linkOptions = true, publicLinkOptions = true, interfaceLinkOptions = true,
+  name = true, kind = true, sources = true, standard = true, systemLinks = true,
+  libraryType = true, extensions = true, outputName = true,
 }
 
---- The keys whose values reach a target's consumers, CMake's `PUBLIC` and `INTERFACE` usage
---- requirements; `includes`, `defines` and `links` stay `PRIVATE`.
-local PRIVATE_KEY_OF = {
-  publicIncludes = "includes", interfaceIncludes = "includes",
-  publicDefines = "defines", interfaceDefines = "defines",
-  publicLinks = "links", interfaceLinks = "links",
-  publicCompileOptions = "compileOptions", interfaceCompileOptions = "compileOptions",
-  publicLinkOptions = "linkOptions", interfaceLinkOptions = "linkOptions",
+--- What reaches a target's consumers, each with the private key that does not.
+local PRIVATE_KEY_OF = {}
+
+--- What an `interface` library may not declare, each with the key that says it instead, or false
+--- when it has none.
+--- @implNote CMake refuses `PRIVATE` and `PUBLIC` on an INTERFACE target at configure time, naming
+--- no manifest line: it builds nothing, so only what reaches its consumers can describe it.
+local REPLACEMENT_ON_AN_INTERFACE_LIBRARY = {
+  sources = false, standard = false, systemLinks = false, extensions = false, outputName = false,
 }
 
-local OPTION_KEYS = {
-  "compileOptions", "publicCompileOptions", "interfaceCompileOptions",
-  "linkOptions", "publicLinkOptions", "interfaceLinkOptions",
-}
+for _, family in ipairs(REQUIREMENT_FAMILIES) do
+  local public, interface = consumer_forms_of(family.key)
+  KNOWN_KEYS[family.key] = family.key ~= "links" or nil
+  TARGET_KEYS[family.key], TARGET_KEYS[public], TARGET_KEYS[interface] = true, true, true
+  PRIVATE_KEY_OF[public], PRIVATE_KEY_OF[interface] = family.key, family.key
+  REPLACEMENT_ON_AN_INTERFACE_LIBRARY[family.key] = interface
+  REPLACEMENT_ON_AN_INTERFACE_LIBRARY[public] = interface
+end
 
 -- A target becomes a task, and core refuses a task name that is not lowercase
 -- or that a lifecycle verb already took.
@@ -206,6 +217,24 @@ local function refuse_a_known_name_as_a_system_library(target, key, declared, pa
   end
 end
 
+local function checked_extensions(value, at)
+  if value ~= nil and type(value) ~= "boolean" then
+    error(string.format('"%s" must be true or false, not a %s', at, type(value)), 0)
+  end
+  return value
+end
+
+--- @implNote the name of the file CMake writes, and `cmake:run` starts it by that name, so only a
+--- plain file name is taken: a path would move the binary away from where the run looks.
+local function checked_output_name(value, at)
+  if value == nil then return nil end
+  if type(value) ~= "string" or string.match(value, "^[%w_%.%-]+$") == nil then
+    error(string.format('"%s" must be a file name of letters, digits, ".", "_" and "-", not "%s"',
+                        at, tostring(value)), 0)
+  end
+  return value
+end
+
 --- Every target, as a LIST, whether the manifest declared one implicitly
 --- through the project-wide keys or several through "targets". The caller
 --- never branches on which, which is the whole point: a generator that loops
@@ -237,16 +266,17 @@ local function targets_of(config, language, project_target, package_names)
       kind = kind,
       libraryKeyword = library_keyword,
       sources = sources,
-      includes = values.path_list(config.includes, "includes", "directories", "directory"),
-      defines = values.cmake_text_list(config.defines, "defines", "definitions", "definition"),
       standard = values.scalar_version(config.standard, "standard"),
-      links = package_names,
+      extensions = checked_extensions(config.extensions, "extensions"),
+      outputName = checked_output_name(config.outputName, "outputName"),
       systemLinks = values.system_library_list(config.systemLinks, "systemLinks") or {},
-      publicLinks = {}, interfaceLinks = {},
-      compileOptions = values.cmake_text_list(config.compileOptions, "compileOptions", "options",
-                                              "option"),
-      linkOptions = values.cmake_text_list(config.linkOptions, "linkOptions", "options", "option"),
     }
+    for _, family in ipairs(REQUIREMENT_FAMILIES) do
+      local public, interface = consumer_forms_of(family.key)
+      only[family.key] = family.read(config[family.key], family.key)
+      only[public], only[interface] = family.read(nil, public), family.read(nil, interface)
+    end
+    only.links = package_names
     refuse_a_known_name_as_a_system_library(only, "systemLinks", { [project_target] = true },
                                             package_names)
     return { only }
@@ -307,28 +337,16 @@ local function targets_of(config, language, project_target, package_names)
       kind = kind,
       libraryKeyword = library_keyword,
       sources = sources,
-      includes = values.path_list(entry.includes, at .. ".includes", "directories", "directory"),
-      defines = values.cmake_text_list(entry.defines, at .. ".defines", "definitions",
-                                       "definition"),
       standard = values.scalar_version(entry.standard, at .. ".standard"),
-      links = values.cmake_text_list(entry.links, at .. ".links", "target names",
-                                     "target name") or {},
+      extensions = checked_extensions(entry.extensions, at .. ".extensions"),
+      outputName = checked_output_name(entry.outputName, at .. ".outputName"),
       systemLinks = values.system_library_list(entry.systemLinks, at .. ".systemLinks") or {},
-      publicIncludes = values.path_list(entry.publicIncludes, at .. ".publicIncludes", "directories",
-                                        "directory"),
-      interfaceIncludes = values.path_list(entry.interfaceIncludes, at .. ".interfaceIncludes",
-                                           "directories", "directory"),
-      publicDefines = values.cmake_text_list(entry.publicDefines, at .. ".publicDefines",
-                                             "definitions", "definition"),
-      interfaceDefines = values.cmake_text_list(entry.interfaceDefines, at .. ".interfaceDefines",
-                                                "definitions", "definition"),
-      publicLinks = values.cmake_text_list(entry.publicLinks, at .. ".publicLinks", "target names",
-                                           "target name") or {},
-      interfaceLinks = values.cmake_text_list(entry.interfaceLinks, at .. ".interfaceLinks",
-                                              "target names", "target name") or {},
     }
-    for _, key in ipairs(OPTION_KEYS) do
-      out[index][key] = values.cmake_text_list(entry[key], at .. "." .. key, "options", "option")
+    for _, family in ipairs(REQUIREMENT_FAMILIES) do
+      local public, interface = consumer_forms_of(family.key)
+      for _, key in ipairs({ family.key, public, interface }) do
+        out[index][key] = family.read(entry[key], at .. "." .. key)
+      end
     end
   end
 
