@@ -152,7 +152,8 @@ local function render(spec)
   end
 
   put("cmake_minimum_required(VERSION 3.20)")
-  put(string.format("project(%s LANGUAGES %s)", spec.project_name, spec.cmake_language))
+  local version = spec.project_version ~= nil and (" VERSION " .. spec.project_version) or ""
+  put(string.format("project(%s%s LANGUAGES %s)", spec.project_name, version, spec.cmake_language))
   put(compiler_report(spec.cmake_language))
   put("")
 
@@ -163,6 +164,19 @@ local function render(spec)
       put(string.format('FetchContent_Declare(%s URL "%s" URL_HASH "SHA256=%s")',
                         entry.package, entry.url, entry.sha256))
       put(string.format("FetchContent_MakeAvailable(%s)", entry.package))
+    end
+    put("")
+  end
+
+  if #spec.findPackages > 0 then
+    for _, package in ipairs(spec.findPackages) do
+      local words = { package.name }
+      if package.version ~= nil then words[#words + 1] = package.version end
+      words[#words + 1] = "REQUIRED"
+      if #package.components > 0 then
+        words[#words + 1] = "COMPONENTS " .. table.concat(package.components, " ")
+      end
+      put(string.format("find_package(%s)", table.concat(words, " ")))
     end
     put("")
   end

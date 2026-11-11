@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(app LANGUAGES C)
+project(app VERSION 1.0.0 LANGUAGES C)
 message(STATUS "daukle: C compiler ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION} at ${CMAKE_C_COMPILER}")
 
 file(GLOB DAUKLE_SOURCES CONFIGURE_DEPENDS

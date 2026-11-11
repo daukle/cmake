@@ -1,6 +1,7 @@
 local values = daukle.require("lib/values")
 local targets = daukle.require("lib/targets")
 local tests = daukle.require("lib/tests")
+local find_packages = daukle.require("lib/find_packages")
 
 local LANGUAGES = { c = "C", ["c++"] = "CXX" }
 local STANDARD_PROPERTY = { c = "C_STANDARD", ["c++"] = "CXX_STANDARD" }
@@ -104,8 +105,12 @@ local function read(context)
   end
 
   local dependencies = dependencies_of(context)
+  local found = find_packages.find_packages_of(config)
   local package_names = {}
   for index = 1, #dependencies do package_names[index] = dependencies[index].package end
+  for _, name in ipairs(find_packages.imported_targets_of(found)) do
+    package_names[#package_names + 1] = name
+  end
 
   local project_target = targets.target_of(context.project)
   local project_targets = targets.targets_of(config, language, project_target, package_names)
@@ -156,6 +161,8 @@ local function read(context)
     standard_property = STANDARD_PROPERTY[language],
     extensions_property = EXTENSIONS_PROPERTY[language],
     project_name = project_target,
+    -- core accepts only major.minor.patch, which is already what project(VERSION) takes
+    project_version = context.version,
     targets = project_targets,
     default = targets.default_target(config, project_targets),
     buildType = build_type or "Debug",
@@ -167,6 +174,7 @@ local function read(context)
     tests = tests.tests_of(config, project_targets),
     testArgs = values.string_list(config.testArgs, "testArgs", "arguments", "argument"),
     dependencies = dependencies,
+    findPackages = found,
     root = context.root,
   }
 end

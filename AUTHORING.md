@@ -44,6 +44,7 @@ version = "4.4"
 | `systemLinks` | none | libraries the HOST provides, e.g. `["m", "pthread"]`; see below. Moves onto each target when `targets` is declared |
 | `configureArgs`, `buildArgs` | none | passed through verbatim to CMake's configure and build steps; see below |
 | `runArgs` | none | your program's argv under `cmake:run` and `cmake:run-<name>`, verbatim; see below |
+| `findPackages` | none | packages CMake finds on the HOST with `find_package`; see Dependencies |
 | `tests` | none | a list of tests that `cmake:test` runs through ctest; see Tasks |
 | `testArgs` | none | passed to ctest after its own flags, e.g. `["-R", "unit", "-j", "4"]` |
 | `targets` | none | a list of targets; see below. Declaring it moves every target key above onto each target |
@@ -321,6 +322,29 @@ archive is built and digested by the case's own `setup.sh`, so the fetch, the di
 subbuild, the link and the include propagation are all real, and `cmake:run` executes the result
 rather than asserting a file. `links-a-resolved-dependency` keeps its unfetchable fixture url and
 remains the byte-exact generation case.
+
+**The project's own `version` is CMake's `project(VERSION)`**, so `PROJECT_VERSION` and its
+components are set for anything the build reads them from. Core accepts only `major.minor.patch`,
+which is already a version CMake takes, so it is written as declared.
+
+
+**A package the HOST provides is found with `findPackages`**, CMake's `find_package`, always
+`REQUIRED`:
+
+```toml
+[[toolchains.cmake.findPackages]]
+name       = "Boost"
+version    = "1.80"
+components = ["filesystem"]
+targets    = ["Boost::filesystem"]
+```
+
+`targets` names the imported targets the package provides, and `links`, `publicLinks` and
+`interfaceLinks` may name those, so a link to one is checked like any other. They are declared
+because which targets a package provides is known only once CMake has found it. On the one-target
+shape the target links every one, as it links every fetched package. **Nothing is provisioned**:
+the package must be installed where CMake looks, so a project using one builds only on a host that
+has it, and a missing package fails `cmake:configure` with CMake's own message.
 
 ## Tasks
 
